@@ -1,0 +1,4 @@
+cd src/preprocess/extract_frames
+python extract_frames_external.py
+python extract_frames_internal_vehicle_view.py
+python extract_frames_internal_ovehead_view.py

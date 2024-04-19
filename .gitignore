@@ -1,3 +1,4 @@
 dataset/
+aux_dataset/extracted_frames/
 aux_dataset/segmentation_data/
 aux_dataset/train_data/
