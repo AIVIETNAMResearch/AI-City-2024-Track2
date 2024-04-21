@@ -168,29 +168,29 @@ class LLMSegment:
     
     def get_instruction_promt_wo_system_prompt(self, text, input_type):
         if input_type == 'pedes':
-            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and answer shortly. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
-Paragraph: document
-Answer:
+            system_prompt = f'''Imagine you are a driver inside a car, you are looking outside the street through car windshield. Given the description of view in front of you after "# Paragraph:". Your task is to split the given description. You MUST go straight to the answer and answer shortly. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
+# Paragraph: street description
+# Answer:
 - appearance: out-look of the pedestrian.
 - location: location of the pedestrian.
 - environment: the description of the environment includes weather, light surface, road,...
 - attention: what the pedestrian looking at? Information helps answer whether the pedestrian is aware of the vehicle
 
 '''
-            fewshot_ins_1 = f'''Paragraph: The pedestrian, a female in her 40s, stands diagonally to the right and in front of the vehicle, with her body oriented perpendicular to the vehicle and to the left. She is closely watching the passing vehicle, unaware of its presence. As she prepares to cross the road, she wears a purple T-shirt on her upper body and black slacks on her lower body. Standing on the sidewalk of an urban area, this situation occurs on a bright and clear weekday, with dry and level asphalt as the road surface. The road is a main road with one-way traffic and one lane. Despite the usual traffic volume, the pedestrian remains unaware of the vehicle due to her line of sight being occupied by the passing vehicle.
-            Answer:'''
+            fewshot_ins_1 = f'''# Paragraph: The pedestrian, a female in her 40s, stands diagonally to the right and in front of the vehicle, with her body oriented perpendicular to the vehicle and to the left. She is closely watching the passing vehicle, unaware of its presence. As she prepares to cross the road, she wears a purple T-shirt on her upper body and black slacks on her lower body. Standing on the sidewalk of an urban area, this situation occurs on a bright and clear weekday, with dry and level asphalt as the road surface. The road is a main road with one-way traffic and one lane. Despite the usual traffic volume, the pedestrian remains unaware of the vehicle due to her line of sight being occupied by the passing vehicle.
+            # Answer:'''
             few_shot_answer_1 = f'''- appearance: The pedestrian, a female in her 40s, she wears a purple T-shirt on her upper body and black slacks on her lower body.
 - location: She stands diagonally to the right and in front of the vehicle, with her body oriented perpendicular to the vehicle and to the left. Standing on the sidewalk of an urban area.
 - environment: The road is a main road with one-way traffic and one lane.  This situation occurs on a bright and clear weekday, with dry and level asphalt as the road surface
 - attention: She is closely watching the passing vehicle, unaware of its presence. Despite the usual traffic volume, the pedestrian remains unaware of the vehicle due to her line of sight being occupied by the passing vehicle.'''
-            fewshot_ins_2 = f'''Paragraph: A man in his 30s, with a height of 160 cm, dressed in a gray T-shirt and black shorts, is standing still diagonally to the right in front of a vehicle on a bright, cloudy weekday. The vehicle is traveling on a dry, level asphalt road, part of a main road with one-way traffic and three lanes. The pedestrian's body is oriented in the same direction as the vehicle, with his line of sight focused ahead in the direction of travel. Despite being far from the vehicle, he is closely watching and is almost aware of its presence. The surroundings are urban, with both sides of the road having sidewalks. The pedestrian seems to be waiting or observing something, possibly getting ready to cross the road. The traffic volume is usual, and the road surface conditions are favorable for safe movement. Overall, it appears to be a calm and routine situation in which the pedestrian and the vehicle are momentarily sharing the road space.
-            Answer:'''
+            fewshot_ins_2 = f'''# Paragraph: A man in his 30s, with a height of 160 cm, dressed in a gray T-shirt and black shorts, is standing still diagonally to the right in front of a vehicle on a bright, cloudy weekday. The vehicle is traveling on a dry, level asphalt road, part of a main road with one-way traffic and three lanes. The pedestrian's body is oriented in the same direction as the vehicle, with his line of sight focused ahead in the direction of travel. Despite being far from the vehicle, he is closely watching and is almost aware of its presence. The surroundings are urban, with both sides of the road having sidewalks. The pedestrian seems to be waiting or observing something, possibly getting ready to cross the road. The traffic volume is usual, and the road surface conditions are favorable for safe movement. Overall, it appears to be a calm and routine situation in which the pedestrian and the vehicle are momentarily sharing the road space.
+            # Answer:'''
             fews_shot_answer_2 = f'''- appearance: A man in his 30s, with a height of 160 cm, dressed in a gray T-shirt and black shorts
 - location: He is standing still diagonally to the right in front of a vehicle on a bright, cloudy weekday. The pedestrian's body is oriented in the same direction as the vehicle, with his line of sight focused ahead in the direction of travel
 - environment: The vehicle is traveling on a dry, level asphalt road, part of a main road with one-way traffic and three lanes. The surroundings are urban, with both sides of the road having sidewalks. The traffic volume is usual, and the road surface conditions are favorable for safe movement
 - attention: Despite being far from the vehicle, he is closely watching and is almost aware of its presence. The pedestrian seems to be waiting or observing something'''
-            fewshot_ins_3 = f'''Paragraph: A male pedestrian in his twenties, measuring 180 cm in height, was spotted near a vehicle. He was wearing a black jacket on his upper body and black slacks on his lower body. The pedestrian was located in an urban area, specifically on a main road with three lanes for one-way traffic. It was a weekday and the weather was clear, resulting in a dim brightness level. The road conditions were dry, with a level incline and an asphalt surface. The traffic volume was light, and both sides of the road had sidewalks. The environment conditions surrounding the pedestrian suggested a relatively peaceful and safe scenario.
-            Answer:'''
+            fewshot_ins_3 = f'''# Paragraph: A male pedestrian in his twenties, measuring 180 cm in height, was spotted near a vehicle. He was wearing a black jacket on his upper body and black slacks on his lower body. The pedestrian was located in an urban area, specifically on a main road with three lanes for one-way traffic. It was a weekday and the weather was clear, resulting in a dim brightness level. The road conditions were dry, with a level incline and an asphalt surface. The traffic volume was light, and both sides of the road had sidewalks. The environment conditions surrounding the pedestrian suggested a relatively peaceful and safe scenario.
+            # Answer:'''
             fews_shot_answer_3 = f'''- appearance: A male pedestrian in his twenties, measuring 180 cm in height. He was wearing a black jacket on his upper body and black slacks on his lower body
             - location: The pedestrian was spotted near a vehicle. He was located in an urban area, specifically on a main road with three lanes for one-way traffic
             - environment: It was a weekday and the weather was clear, resulting in a dim brightness level. The road conditions were dry, with a level incline and an asphalt surface. The traffic volume was light, and both sides of the road had sidewalks. The environment conditions surrounding the pedestrian suggested a relatively peaceful and safe scenario.
@@ -202,8 +202,8 @@ Answer:
                 {"role": "assistant", "content": fews_shot_answer_2},
                 {"role": "user", "content": f'{system_prompt}{fewshot_ins_3}'},
                 {"role": "assistant", "content": fews_shot_answer_3},
-                {"role": "user", "content": f'''{system_prompt}Paragraph: {text}
-            Answer:'''},
+                {"role": "user", "content": f'''{system_prompt}# Paragraph: {text}
+            # Answer:'''},
             ]
             prompt = self.tokenizer.apply_chat_template(
                 messages,
@@ -212,29 +212,29 @@ Answer:
             )
             return prompt
         else:
-            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and answer shortly. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
-Paragraph: document
-Answer:
+            system_prompt = f'''Imagine you are a driver inside a car, you are looking outside the street through car windshield. Given the description of view in front of you after "# Paragraph:". Your task is to split the given description. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
+# Paragraph: street description
+# Answer:
 - appearance: out-look of the pedestrian.
 - location: location of the pedestrian.
 - environment: the description of the environment includes weather, light surface, road,...
 - action: speed of the vehicle and the action of the vehicle: direction, go, pass,...
 
 '''
-            fewshot_ins_1 = f'''Paragraph: The vehicle was moving at a constant speed of 10km/h. It was positioned behind a pedestrian and was quite far away from them. The vehicle had a clear view of the pedestrian. It was going straight ahead without any change in direction. The environment conditions indicated that the pedestrian was a male in his 30s with a height of 160 cm. He was wearing a gray T-shirt and black short pants. The event took place in an urban area on a weekday. The weather was cloudy but the brightness was bright. The road surface was dry and level, made of asphalt. The traffic volume was usual on the main road that had one-way traffic with three lanes. Sidewalks were present on both sides of the road.
-            Answer:'''
+            fewshot_ins_1 = f'''# Paragraph: The vehicle was moving at a constant speed of 10km/h. It was positioned behind a pedestrian and was quite far away from them. The vehicle had a clear view of the pedestrian. It was going straight ahead without any change in direction. The environment conditions indicated that the pedestrian was a male in his 30s with a height of 160 cm. He was wearing a gray T-shirt and black short pants. The event took place in an urban area on a weekday. The weather was cloudy but the brightness was bright. The road surface was dry and level, made of asphalt. The traffic volume was usual on the main road that had one-way traffic with three lanes. Sidewalks were present on both sides of the road.
+            # Answer:'''
             few_shot_answer_1 = f'''- appearance: The environment conditions indicated that the pedestrian was a male in his 30s with a height of 160 cm. He was wearing a gray T-shirt and black short pants.
 - location: It was positioned behind a pedestrian and was quite far away from them. The vehicle had a clear view of the pedestrian.
 - environment: The event took place in an urban area on a weekday. The weather was cloudy but the brightness was bright. The road surface was dry and level, made of asphalt. The traffic volume was usual on the main road that had one-way traffic with three lanes. Sidewalks were present on both sides of the road.
 - action: The vehicle was moving at a constant speed of 10km/h. It was going straight ahead without any change in direction'''
-            fewshot_ins_2 = f'''Paragraph: The vehicle is moving at a constant speed of 15 km/h, proceeding straight ahead on a main road. It is diagonally positioned to the left in front of the pedestrian, who is visible within the vehicle's field of view. The vehicle is far from the pedestrian, providing a safe distance. The environment conditions reflect a female pedestrian in her 40s, standing at a height of 160 cm. She is wearing purple T-shirt, black slacks, and glasses. The event is taking place in an urban location, on a clear and bright weekday. The road surface is dry, with a level inclined asphalt. Traffic volume is normal, and the road is classified as a one-way, one lane street with sidewalks on both sides. This concise description provides an overview of the vehicle's state and the surrounding environmental conditions without any additional personal or emotive details.
-            Answer:'''
+            fewshot_ins_2 = f'''# Paragraph: The vehicle is moving at a constant speed of 15 km/h, proceeding straight ahead on a main road. It is diagonally positioned to the left in front of the pedestrian, who is visible within the vehicle's field of view. The vehicle is far from the pedestrian, providing a safe distance. The environment conditions reflect a female pedestrian in her 40s, standing at a height of 160 cm. She is wearing purple T-shirt, black slacks, and glasses. The event is taking place in an urban location, on a clear and bright weekday. The road surface is dry, with a level inclined asphalt. Traffic volume is normal, and the road is classified as a one-way, one lane street with sidewalks on both sides. This concise description provides an overview of the vehicle's state and the surrounding environmental conditions without any additional personal or emotive details.
+            # Answer:'''
             fews_shot_answer_2 = f'''- appearance: The environment conditions reflect a female pedestrian in her 40s, standing at a height of 160 cm. She is wearing purple T-shirt, black slacks, and glasses
 - location: The vehicle proceeding straight ahead on a main road. It is diagonally positioned to the left in front of the pedestrian, who is visible within the vehicle's field of view. The vehicle is far from the pedestrian, providing a safe distance
 - environment: The event is taking place in an urban location, on a clear and bright weekday. The road surface is dry, with a level inclined asphalt. Traffic volume is normal, and the road is classified as a one-way, one lane street with sidewalks on both sides
 - action: The vehicle is moving at a constant speed of 15 km/h'''
-            fewshot_ins_3 = f'''Paragraph: The vehicle is positioned on the right side of a pedestrian. It is relatively close to the pedestrian, and the pedestrian is clearly visible within the vehicle's field of view. The vehicle is being operated in an urban setting on a regular weekday. The environmental conditions indicate that the pedestrian is a male in his 20s, standing at a height of 160 cm. He is wearing a blue jacket and turquoise slacks. The road conditions are favorable, with a dry asphalt surface and bright lighting. The road on which the vehicle is driving is a main road with one-way traffic and two lanes, and there are sidewalks available on both sides.
-            Answer:'''
+            fewshot_ins_3 = f'''# Paragraph: The vehicle is positioned on the right side of a pedestrian. It is relatively close to the pedestrian, and the pedestrian is clearly visible within the vehicle's field of view. The vehicle is being operated in an urban setting on a regular weekday. The environmental conditions indicate that the pedestrian is a male in his 20s, standing at a height of 160 cm. He is wearing a blue jacket and turquoise slacks. The road conditions are favorable, with a dry asphalt surface and bright lighting. The road on which the vehicle is driving is a main road with one-way traffic and two lanes, and there are sidewalks available on both sides.
+            # Answer:'''
             fews_shot_answer_3 = f'''- appearance: The pedestrian is a male in his 20s, standing at a height of 160 cm. He is wearing a blue jacket and turquoise slacks
 - location: The vehicle is positioned on the right side of a pedestrian. It is relatively close to the pedestrian.
 - environment: The vehicle is being operated in an urban setting on a regular weekday. The road conditions are favorable, with a dry asphalt surface and bright lighting. The road on which the vehicle is driving is a main road with one-way traffic and two lanes, and there are sidewalks available on both sides.
@@ -246,8 +246,8 @@ Answer:
                 {"role": "assistant", "content": fews_shot_answer_2},
                 {"role": "user", "content": f'{system_prompt}{fewshot_ins_3}'},
                 {"role": "assistant", "content": fews_shot_answer_3},
-                {"role": "user", "content": f'''{system_prompt}Paragraph: {text}
-            Answer:'''},
+                {"role": "user", "content": f'''{system_prompt}# Paragraph: {text}
+            # Answer:'''},
             ]
             prompt = self.tokenizer.apply_chat_template(
                 messages,
@@ -258,7 +258,7 @@ Answer:
 
     def get_instruction_w_system_promt(self, text, input_type):
         if input_type == 'pedes':
-            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and anwser shortly. Extract these 4 information from the paragraph. Each information could be in seperate place in the paragraph, you MUST use linking words to combine these information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information not containt in the graph just ignore it. Give answer with the following format:
+            system_prompt = f'''You are a helpful system and always generate useful answers. You MUST go straight to the answer and anwser shortly. Extract these 4 information from the paragraph. Each information could be in seperate place in the paragraph, you MUST use linking words to combine these information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information not containt in the graph just ignore it. Give answer with the following format:
 Paragraph: document
 Answer:
 - appearance: out-look of the pedestrian.
@@ -295,7 +295,7 @@ You will be penalized if answer the wrong format from the above format'''
             )
             return prompt
         else:
-            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and anwser shortly. Extract these 4 information from the paragraph. Each information could be in seperate place in the paragraph, you MUST use linking words to combine these information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information not containt in the graph just ignore it. Give answer with the following format:
+            system_prompt = f'''You are a helpful system and always generate useful answers. You MUST go straight to the answer and anwser shortly. Extract these 4 information from the paragraph. Each information could be in seperate place in the paragraph, you MUST use linking words to combine these information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information not containt in the graph just ignore it. Give answer with the following format:
 Paragraph: document
 Answer:
 - appearance: out-look of the pedestrian.
