@@ -8,3 +8,4 @@ torchvision
 pillow
 tensorboard
 matplotlib
+peft

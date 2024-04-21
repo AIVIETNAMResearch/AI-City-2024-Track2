@@ -1,4 +1,23 @@
 # AICITY2024 Track 2 - Code from AIO_ISC Team
+
+The 2nd Place Solution to The 8th NVIDIA AI City Challenge (2024) Track 2
+<p align="center">
+    <img src="figures/main_figure.jpg"/>
+</p>
+
+---
+## Results
+
+| **Rank**            |       **Team ID**       |         **Team name**          |             **MRR Score**              |
+|:--------------------:|:-----------------------------:|:----------------------------:|:---------------------------------:|
+| 1 |   208   |   AliOpenTrek   |   33.4308    |
+| **2** |   **28**  | **AIO_ISC (Ours)** |   **32.8877**   |
+| 3 |   68  |      Lighthouse       |   32.3006    |
+| 4 |   87 |    VAI     |   32.2778    |
+| 5 |   184  |    Santa Claude	    |   29.7838    |
+
+---
+
 ## Structure
 ### Code Structure
 ```
@@ -46,40 +65,40 @@
 ```
 
 ## Environment
-### Preprocessing + postprocessing
 ```
 pip install -r requirements.txt
 ```
-### Training
-Please set up the environment following [Qwen-VL environment](src/train/Qwen-VL/README.md).
 
 ## Prepare
 ### Preprocessing
-Extracting video frames :
+Extracting video frames:
 ```
 sh tools/extract_frames.sh
 ```
 
-Segment Extraction :
+Segment Extraction:
 ```
 Updating
 ```
 
 ### Training
-Prepare train data :
+Prepare train data:
 ```
 sh tools/prepare_train_data.sh
 ```
 
-Training :
+Training:
 Set the correct train and eval data path and run the code in [here](src/train/Qwen-VL/finetune/finetune_lora_single_gpu.sh).
 
 ### Inference
-Updating.
+Inference trained model on test set:
+```
+sh tools/inference.sh
+```
+The pretrained checkpoints are listed in [here](src/inference/ckpt.json). 
 
 ### Postprocessing
 Updating.
 
 ### Evaluation
 We follow [wts-dataset repo](https://github.com/woven-visionai/wts-dataset) and reimplement the fast version at [here](src/evaluation/metrics.py).
-
