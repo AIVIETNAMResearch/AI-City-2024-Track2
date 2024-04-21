@@ -1,25 +1,14 @@
 import os
 import cv2
-import json
+import sys
 import ffmpeg
 import argparse
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from os.path import join as osp 
-
-mapper = {
-    "prerecognition":"0",
-    "recognition":"1",
-    "judgement":"2",
-    "action":"3",
-    "avoidance":"4"
-    }
-
-def load_json(path):
-    with open(path, 'r') as f:
-        data = json.load(f)
-    return data
+sys.path.append('../../utils')
+from utils import load_json
 
 def main(args):
     type = args.type
@@ -47,14 +36,16 @@ def main(args):
             video_paths = os.listdir(video_root)
 
             for video_name in tqdm(video_paths):
-                caption_anno =  osp(caption_anno_root, video_name, 'vehicle_view', video_name) + '_caption.json'
-                with open(caption_anno, 'r') as f:
-                    caption_anno = json.load(f)
-
                 try:
-                    with open(osp(bbox_anno_root, video_name, 'vehicle_view', video_name + '_vehicle_view_bbox.json'), 'r') as f:
-                        bbox = json.load(f)['annotations']
+                    caption_anno = load_json(osp(caption_anno_root, video_name, 'vehicle_view', video_name) + '_caption.json')
                 except:
+                    print(f'Error loading caption json for {video_name}')
+                    continue
+                
+                try:
+                    bbox = load_json(osp(bbox_anno_root, video_name, 'vehicle_view', video_name + '_vehicle_view_bbox.json'))['annotations']
+                except:
+                    print(f'Error loading bounding box json for {video_name}')
                     continue
 
                 bbox_dict = dict()
@@ -73,8 +64,6 @@ def main(args):
                                                             end_time=float(e['end_time']),
                                                             bbox=bbox_dict[phase_number]['bbox'],
                                                             frame_id=bbox_dict[phase_number]['image_id'])
-                    else:
-                        phase_captions[phase_number] = None
 
                 os.makedirs(osp(output_dir, video_name), exist_ok=True)
                 for phase_number, phase_anno in phase_captions.items():

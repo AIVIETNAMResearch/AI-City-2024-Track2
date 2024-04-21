@@ -1,25 +1,14 @@
 import os
 import cv2
-import json
+import sys
 import ffmpeg
 import argparse
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from os.path import join as osp 
-
-mapper = {
-    "prerecognition":"0",
-    "recognition":"1",
-    "judgement":"2",
-    "action":"3",
-    "avoidance":"4"
-    }
-
-def load_json(path):
-    with open(path, 'r') as f:
-        data = json.load(f)
-    return data
+sys.path.append('../../utils')
+from utils import load_json
 
 def main(args):
     type = args.type
@@ -48,20 +37,18 @@ def main(args):
             video_paths = os.listdir(video_root)
 
             for video_name in tqdm(video_paths):
-                caption_anno =  osp(caption_anno_root, video_name, 'overhead_view', video_name) + '_caption.json'
-                with open(caption_anno, 'r') as f:
-                    caption_anno = json.load(f)
-
+                try:
+                    caption_anno = load_json(osp(caption_anno_root, video_name, 'overhead_view', video_name) + '_caption.json')
+                except:
+                    print(f'Error loading caption json for {video_name}')
+                    continue
+                
                 overhead_videos = caption_anno['overhead_videos']
-
                 for overhead_video in overhead_videos:
                     overhead_video_prefix = overhead_video[:-4]
                     try:
-                        with open(osp(bbox_anno_root_pedestrian, video_name, 'overhead_view', overhead_video_prefix + '_bbox.json'), 'r') as f:
-                            bbox_pedestrian = json.load(f)['annotations']
-                        
-                        with open(osp(bbox_anno_root_vehicle, video_name, 'overhead_view', overhead_video_prefix + '_bbox.json'), 'r') as f:
-                            bbox_vehicle = json.load(f)['annotations']
+                        bbox_pedestrian = load_json(osp(bbox_anno_root_pedestrian, video_name, 'overhead_view', overhead_video_prefix + '_bbox.json'))['annotations']
+                        bbox_vehicle = load_json(osp(bbox_anno_root_vehicle, video_name, 'overhead_view', overhead_video_prefix + '_bbox.json'))['annotations']
                     except:
                         print(osp(bbox_anno_root_pedestrian, video_name, 'overhead_view', overhead_video_prefix + '_bbox.json'))
                         continue

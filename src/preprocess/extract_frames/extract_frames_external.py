@@ -1,24 +1,14 @@
 import os
 import cv2
-import json
+import sys
 import ffmpeg
 import argparse
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from os.path import join as osp 
-
-mapper = {
-    "prerecognition":"0",
-    "recognition":"1",
-    "judgement":"2",
-    "action":"3",
-    "avoidance":"4"
-    }
-def load_json(path):
-    with open(path, 'r') as f:
-        data = json.load(f)
-    return data
+sys.path.append('../../utils')
+from utils import phase2num, load_json
 
 def main(args):
     type = args.type
@@ -61,7 +51,7 @@ def main(args):
                 if e['labels'][0].isdigit():
                     phase_number = e['labels'][0]
                 else:
-                    phase_number = mapper[e['labels'][0]]
+                    phase_number = phase2num[e['labels'][0]]
                 
                 if bounding_box_dict.get(phase_number, False):
                     phase_captions[phase_number] = dict(start_time=float(e['start_time']),

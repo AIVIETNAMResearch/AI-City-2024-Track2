@@ -59,6 +59,7 @@ Extracting video frames :
 ```
 sh tools/extract_frames.sh
 ```
+
 Segment Extraction :
 ```
 Updating
@@ -67,10 +68,10 @@ Updating
 ### Training
 Prepare train data :
 ```
-Updating
+sh tools/prepare_train_data.sh
 ```
-Training :
 
+Training :
 Set the correct train and eval data path and run the code in [here](src/train/Qwen-VL/finetune/finetune_lora_single_gpu.sh).
 
 ### Inference
