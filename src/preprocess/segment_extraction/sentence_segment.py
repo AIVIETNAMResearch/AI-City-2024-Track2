@@ -9,7 +9,7 @@ from os.path import join as osp
 import json
 import statistics
 import requests
-from constant import *
+import spacy
 
 import torch
 import torch.nn.functional as F
@@ -20,31 +20,27 @@ import numpy as np
 from torcheval.metrics.functional.text import bleu_score
 
 import re
-import spacy
 from sentence_transformers import SentenceTransformer
 
+from huggingface_hub import login
+login(token=os.environ.get("HF_TOKEN"))
 class LLMSegment:
     def __init__(
         self,
-        model_name='Qwen/Qwen1.5-7B-Chat',
+        model_name,
+        use_vllm = True,
+        max_length = 512
     ):
-        # self.model = AutoModelForCausalLM.from_pretrained(
-        #     model_name,
-        #     device_map='auto',
-        #     torch_dtype=torch.bfloat16, 
-        #     attn_implementation="flash_attention_2",
-        # )
         self.model_name = model_name
-        self.ollama = ollama
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        # self.model_device = self.model.device
-        if not ollama:
-            self.sampling_params = SamplingParams(temperature=0.7, top_p=0.85, top_k=3, max_tokens=512)
-            LLM(
+        self.use_vllm = use_vllm
+        self.max_length = max_length
+        if use_vllm:
+            self.sampling_params = SamplingParams(temperature=0.7, top_p=0.85, top_k=3, max_tokens=max_length)
+            self.model = LLM(
                 model=model_name,
                 #kv_cache_dtype="fp8_e5m2",
                 #gpu_memory_utilization=1,
-                #  quantization="awq",
                 #  dtype="auto",
                 #  swap_space=8,
                 #  gpu_memory_utilization=0.9,
@@ -52,24 +48,18 @@ class LLMSegment:
                 # dtype='bfloat16'
                 # max_model_len=10000,
             )
-        
-    # def __call__(self, file_path, output_path):
-    #     os.makedirs(output_path, exist_ok=True)
-    #     file_paths = glob(osp(PROJECT_ROOT, file_path))
-    #     for path in tqdm(file_paths):
-    #         video_name = path.split('/')[-1].split('_')[0]
-    #         with open(path, 'r') as f:
-    #             phases = json.load(f)["event_phase"]
-    #         for phase in phases:
-    #             phase['pesdes_info'] = self.get_information(phase['caption_pedestrian'], input_type='pedes')
-    #             phase['vehicle_info'] = self.get_information(phase['caption_vehicle'], input_type='vehicle')
-    #         with open(osp(output_path, f'{video_name}_information.json'), 'w') as f:
-    #             json.dump(phases, f, indent=4)
-    #     return None
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                device_map='auto',
+                torch_dtype=torch.bfloat16, 
+                attn_implementation="flash_attention_2",
+            )
+            self.model_device = self.model.device
     
-    def __call__(self, file_path, output_path, run_percentage=1, shuffle=False):
+    def __call__(self, data_path, output_path, run_percentage=1, shuffle=False):
         os.makedirs(output_path, exist_ok=True)
-        file_paths = glob(osp(PROJECT_ROOT, file_path))
+        file_paths = glob(data_path)
         if shuffle:
             random.shuffle(file_paths)
         num_run_sample = int(len(file_paths)*run_percentage)
@@ -82,14 +72,20 @@ class LLMSegment:
             for phase in phases:
                 pedes_captions.append(self.get_prompt(phase['caption_pedestrian'], input_type='pedes'))
                 vehicle_captions.append(self.get_prompt(phase['caption_vehicle'], input_type='vehicle'))
-            pedes_informations = self.get_information_vllm(pedes_captions)
-            vehicle_informations = self.get_information_vllm(vehicle_captions)
+            pedes_informations = self.get_information(pedes_captions)
+            vehicle_informations = self.get_information(vehicle_captions)
             for phase, pedes_information, vehicle_information in zip(phases, pedes_informations, vehicle_informations):
                 phase['pesdes_info'] = pedes_information
                 phase['vehicle_info'] = vehicle_information
             with open(osp(output_path, f'{video_name}_information.json'), 'w') as f:
                 json.dump(phases, f, indent=4)
         return None
+    
+    def get_information(self, texts):
+        if self.use_vllm:
+            return self.get_information_vllm(texts)
+        else:
+            return self.get_information_base(texts)
     
     def get_information_vllm(self, texts):
         outputs = self.model.generate(texts, self.sampling_params, use_tqdm=False)
@@ -99,24 +95,14 @@ class LLMSegment:
             results.append(generated_text)
         return results
         
-    def get_information(self, text, input_type, max_length=512):
-        prompt = self.get_prompt(text, input_type)
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model_device)
-        outputs = self.model.generate(**inputs, max_new_tokens=max_length)
-        output = self.tokenizer.decode(outputs[0][len(inputs[0]):], skip_special_tokens=True)
-        
-        return output
-    
-    def ollama_generate(self, prompts):
-        result = []
-        for prompt in prompts:
-            query_data = {
-                "model": self.model_name,
-                "prompt": prompt,
-                "stream": False
-            }
-            result.append(requests.post(self.url, json=query_data, headers=self.headers).json()['response'])
-        return result
+    def get_information_base(self, texts):
+        outputs_result = []
+        for prompt in texts:
+            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model_device)
+            outputs = self.model.generate(**inputs, max_new_tokens=self.max_length)
+            output = self.tokenizer.decode(outputs[0][len(inputs[0]):], skip_special_tokens=True)
+            outputs_result.append(output)
+        return outputs_result
     
     @staticmethod
     def information_spliter(file_paths, output_path, error_folder=None):
@@ -125,6 +111,9 @@ class LLMSegment:
         to handle the paragraph and generate infomration about appearance, location,... etc
         the information will be added into the file
         '''
+        os.makedirs(output_path, exist_ok=True)
+        if error_folder:
+            os.makedirs(error_folder, exist_ok=True)
         folder_paths = glob(file_paths)
         pedes_keys_name = ['appearance', 'location', 'environment', 'attention']
         vehicle_keys_name = ['appearance', 'location', 'environment', 'action']
@@ -138,7 +127,7 @@ class LLMSegment:
                 vehicle_info = phase['vehicle_info'].split('[INST]')[0].split('\n')[:4]
                 try:
                     pedes_result = {
-                        key:' '.join(value.split(':')[1:]).strip() for (value, key) in zip(pesdes_info, pedes_keys_name[:len(pesdes_info)])
+                        key:' '.join(value.split(':')[1:]).strip() for (value, key) in zip(pesdes_info, pedes_keys_name)
                     }
                     phase['pedes_detail_extraction'] = pedes_result
                 except:
@@ -173,54 +162,19 @@ class LLMSegment:
                 os.makedirs(error_folder, exist_ok=True)
                 with open(osp(error_folder, f'{video_name}.jsonl'), 'w') as f:
                     json.dump(error_result, f, indent=4)
-                    
-    @staticmethod
-    def check_acc(processed_file_paths='/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/train/processed/*.json'):
-        '''
-        This function mesure the bleu score between the extracted information
-        and the original caption to see if the extracted in formation enough
-        or being changed or not
-        
-        processed_file_paths: glob files paths of processed data return by information_spliter
-        functionh
-        
-        return: bleu score of the extracted information
-        '''
-        processed_data_paths = glob(processed_file_paths)
-        vehicle_total_score = []
-        pedes_total_score = []
-        for process_file in processed_data_paths:
-            with open(process_file, 'r') as f:
-                process_phases = json.load(f)
-            for phase in process_phases:
-                pedes_caption = phase['caption_pedestrian']
-                vehicle_caption = phase['caption_vehicle']
-                process_pedes_caption = ' '.join([item.strip() for item in phase['pedes_detail_extraction'].values()])
-                process_vehicle_caption = ' '.join([item.strip() for item in phase['vehicle_detail_extract'].values()])
-                vehicle_total_score.append(bleu_score([process_pedes_caption], [[pedes_caption]], n_gram=3).item())
-                pedes_total_score.append(bleu_score([process_vehicle_caption], [[vehicle_caption]], n_gram=3).item())
-        print(f'bleu scorer of pedestrian: {statistics.mean(pedes_total_score)}')
-        print(f'bleu score of vehicle: {statistics.mean(vehicle_total_score)}')
-        
-        result = {
-            'pedes score': statistics.mean(vehicle_total_score),
-            'vehicle score': statistics.mean(vehicle_total_score),
-        }
-        
-        return result
     
     def get_prompt(self, text, input_type):
         return self.get_instruction_promt_wo_system_prompt(text=text, input_type=input_type)    
     
     def get_instruction_promt_wo_system_prompt(self, text, input_type):
         if input_type == 'pedes':
-            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and anwser shortly. Extract these 4 information from the paragraph. Each information could be in seperate place in the paragraph, you MUST use linking words to combine these information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information not containt in the graph return NaN. Give answer with the following format. You will be penalized if answer the wrong format from the above format:
+            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and answer shortly. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
 Paragraph: document
 Answer:
 - appearance: out-look of the pedestrian.
 - location: location of the pedestrian.
-- environment: the describe of the environment include weather, lightm surface, road,...
-- attention: what the pedestrian looking at ?. Information help answer whether the pedestrian can aware of the vehicle
+- environment: the description of the environment includes weather, light surface, road,...
+- attention: what the pedestrian looking at? Information helps answer whether the pedestrian is aware of the vehicle
 
 '''
             fewshot_ins_1 = f'''Paragraph: The pedestrian, a female in her 40s, stands diagonally to the right and in front of the vehicle, with her body oriented perpendicular to the vehicle and to the left. She is closely watching the passing vehicle, unaware of its presence. As she prepares to cross the road, she wears a purple T-shirt on her upper body and black slacks on her lower body. Standing on the sidewalk of an urban area, this situation occurs on a bright and clear weekday, with dry and level asphalt as the road surface. The road is a main road with one-way traffic and one lane. Despite the usual traffic volume, the pedestrian remains unaware of the vehicle due to her line of sight being occupied by the passing vehicle.
@@ -258,13 +212,13 @@ Answer:
             )
             return prompt
         else:
-            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and anwser shortly. Extract these 4 information from the paragraph. Each information could be in seperate place in the paragraph, you MUST use linking words to combine these information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information not containt in the graph return NaN. Give answer with the following format. You will be penalized if answer the wrong format from the above format:
+            system_prompt = f'''I will tip you 500k$ for a better solution. You are a helpful system and always generate useful answers. You MUST go straight to the answer and answer shortly. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
 Paragraph: document
 Answer:
 - appearance: out-look of the pedestrian.
 - location: location of the pedestrian.
-- environment: the describe of the environment include weather, lightm surface, road,...
-- action: speed of vehivle and the action of the vehicle: direction, go, pass,...
+- environment: the description of the environment includes weather, light surface, road,...
+- action: speed of the vehicle and the action of the vehicle: direction, go, pass,...
 
 '''
             fewshot_ins_1 = f'''Paragraph: The vehicle was moving at a constant speed of 10km/h. It was positioned behind a pedestrian and was quite far away from them. The vehicle had a clear view of the pedestrian. It was going straight ahead without any change in direction. The environment conditions indicated that the pedestrian was a male in his 30s with a height of 160 cm. He was wearing a gray T-shirt and black short pants. The event took place in an urban area on a weekday. The weather was cloudy but the brightness was bright. The road surface was dry and level, made of asphalt. The traffic volume was usual on the main road that had one-way traffic with three lanes. Sidewalks were present on both sides of the road.
@@ -309,7 +263,7 @@ Paragraph: document
 Answer:
 - appearance: out-look of the pedestrian.
 - location: location of the pedestrian.
-- environment: the describe of the environment include weather, lightm surface, road,...
+- environment: the describe of the environment include weather, light surface, road,...
 - attention: what the pedestrian looking at ?. Information help answer whether the pedestrian can aware of the vehicle
 
 You will be penalized if answer the wrong format from the above format'''
@@ -346,8 +300,8 @@ Paragraph: document
 Answer:
 - appearance: out-look of the pedestrian.
 - location: location of the pedestrian.
-- environment: the describe of the environment include weather, lightm surface, road,...
-- action: speed of vehivle and the action of the vehicle: direction, go, pass,...
+- environment: the describe of the environment include weather, light surface, road,...
+- action: speed of vehicle and the action of the vehicle: direction, go, pass,...
 
 You will be penalized if answer the wrong format from the above format'''
             fewshot_ins_1 = f'''Paragraph: The vehicle was moving at a constant speed of 10km/h. It was positioned behind a pedestrian and was quite far away from them. The vehicle had a clear view of the pedestrian. It was going straight ahead without any change in direction. The environment conditions indicated that the pedestrian was a male in his 30s with a height of 160 cm. He was wearing a gray T-shirt and black short pants. The event took place in an urban area on a weekday. The weather was cloudy but the brightness was bright. The road surface was dry and level, made of asphalt. The traffic volume was usual on the main road that had one-way traffic with three lanes. Sidewalks were present on both sides of the road.
@@ -377,27 +331,57 @@ You will be penalized if answer the wrong format from the above format'''
                 add_generation_prompt=True
             )
             return prompt
+        
+    @staticmethod
+    def check_acc(processed_file_paths='/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/train/processed/*.json'):
+        '''
+        This function measure the bleu score between the extracted information
+        and the original caption to see if the extracted in formation enough
+        or being changed or not
+        
+        processed_file_paths: glob files paths of processed data return by information_spliter
+        function
+        
+        return: bleu score of the extracted information
+        '''
+        processed_data_paths = glob(processed_file_paths)
+        vehicle_total_score = []
+        pedes_total_score = []
+        for process_file in processed_data_paths:
+            with open(process_file, 'r') as f:
+                process_phases = json.load(f)
+            for phase in process_phases:
+                pedes_caption = phase['caption_pedestrian']
+                vehicle_caption = phase['caption_vehicle']
+                process_pedes_caption = ' '.join([item.strip() for item in phase['pedes_detail_extraction'].values()])
+                process_vehicle_caption = ' '.join([item.strip() for item in phase['vehicle_detail_extract'].values()])
+                vehicle_total_score.append(bleu_score([process_pedes_caption], [[pedes_caption]], n_gram=3).item())
+                pedes_total_score.append(bleu_score([process_vehicle_caption], [[vehicle_caption]], n_gram=3).item())
+        print("==========================================================")
+        print(f'bleu scorer of pedestrian: {statistics.mean(pedes_total_score)}')
+        print(f'bleu score of vehicle: {statistics.mean(vehicle_total_score)}')
+        print("==========================================================")
+        result = {
+            'pedes score': statistics.mean(vehicle_total_score),
+            'vehicle score': statistics.mean(vehicle_total_score),
+        }
+        
+        return result
 
 class DynamicSentenceSegmentation:
     def __init__(self, model_name='sentence-transformers/all-MiniLM-L6-v2'):
-        # self.model = AutoModel.from_pretrained(
-        #     model_name,
-        #     device_map='auto',
-        #     torch_dtype=torch.bfloat16, 
-        #     attn_implementation="flash_attention_2",
-        # )
-        self.model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        self.model = SentenceTransformer(model_name)
         self.nlp = spacy.load("en_core_web_sm")
     
     
     def __call__(
         self,
-        data_paths = '/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/train/processed_2/*.json',
-        output_path='/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/train/post_processed_2'
+        data_paths,
+        output_path
     ):
         os.makedirs(output_path, exist_ok=True)
         data_paths = glob(data_paths)
-        for data_path in tqdm(data_paths[:2]):
+        for data_path in tqdm(data_paths):
             video_name = data_path.split('/')[-1].split('_')[0]
             with open(data_path, 'r') as f:
                 phases = json.load(f)
@@ -414,8 +398,8 @@ class DynamicSentenceSegmentation:
                 vehicle_information_embedding_dict = {
                     key: self.get_embedding(value) for (key, value) in phase['vehicle_detail_extract'].items()
                 }
-                pedestrian_chunks = self.spliter(phase['caption_pedestrian'])
-                vehicle_chunks = self.spliter(phase['caption_vehicle'])
+                pedestrian_chunks = self.get_spliter(phase['caption_pedestrian'])
+                vehicle_chunks = self.get_spliter(phase['caption_vehicle'])
                 for pedestrian_chunk in pedestrian_chunks:
                     pedestrian_chunk_type = self.get_which_type(pedestrian_chunk, pedes_information_embedding_dict)
                     phase['post_process_pedes_detail_extraction'][pedestrian_chunk_type].append(pedestrian_chunk)
@@ -438,7 +422,13 @@ class DynamicSentenceSegmentation:
         text_type = similarity_score_dictionary[max(list(similarity_score_dictionary.keys()))]
         return text_type
     
-    def spliter(self, sentences):
+    def get_spliter(self, sentences):
+        return self.easy_spliter(sentences)
+    
+    def easy_spliter(self, sentences):
+        return [sentence.text for sentence in self.nlp(sentences).sents]
+    
+    def hard_spliter(self, sentences):
         '''
         Split a caption into chunk of information that contain only 1 information about
         the target information. It split the sentence by '.'  ',' 'and'. If some chunk
@@ -499,21 +489,22 @@ class DynamicSentenceSegmentation:
         return F.cosine_similarity(tensorA, tensorB).item()
     
 if __name__ == "__main__":
-    # segment_caption = SimSegment()
-    #data_path = '/home/server1-ailab/Desktop/Khai/CVPRW/wts_dataset_zip/annotations/caption/train/*/*/*.json'
-    # data_path = '/home/server1-ailab/Desktop/Khai/CVPRW/wts_dataset_zip/external/BDD_PC_5K/annotations/caption/train/*.json'
-    # output_path = '/home/server1-ailab/Desktop/Khai/CVPRW/test_external.json'
-    # segment_caption(data_path=data_path, output_path=output_path)
-    data_path = '/home/server1-ailab/Desktop/Khai/CVPRW/wts_dataset_zip/external/BDD_PC_5K/annotations/caption/val/*.json'
-    output_path = '/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/val/raw_2'
-    # segment_caption = LLMSegment(model_name='mistralai/Mistral-7B-Instruct-v0.2')
-    # segment_caption(file_path=data_path, output_path=output_path, run_percentage=0.03, shuffle=False)
-    # LLMSegment.information_spliter(file_paths='/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/val/raw_2/*.json',
-    #                                output_path='/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/val/processed_2',
-    #                                error_folder='/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/val/error_folder')
-    # LLMSegment.check_acc('/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/val/processed_2/*.json')
+    pre_segment = LLMSegment(model_name = "mistralai/Mistral-7B-Instruct-v0.2", use_vllm=True)
+    data_path = '/home/genai48gb/Desktop/AI-City-2024-Track2/dataset/external/BDD_PC_5K/annotations/caption/train/*.json'
+    output_raw_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test"
+    output_processed_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test_2"
+    error_tracking_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/error_test" # could be not set or leave to none
+    dynamic_segment_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test_3"
+    pre_segment(data_path=data_path, output_path=output_raw_path, run_percentage=0.01)
+    LLMSegment.information_spliter(
+        file_paths=output_raw_path + "/*.json",
+        output_path=output_processed_path,
+        error_folder=error_tracking_path
+    )
+    LLMSegment.check_acc(output_processed_path + '/*.json')
     dynamic_sengment = DynamicSentenceSegmentation()
     dynamic_sengment(
-        data_paths='/home/server1-ailab/Desktop/Khai/CVPRW/segmentation_data/mistral/val/processed_2/*.json',
-        output_path='/home/server1-ailab/Desktop/Khai/CVPRW/test'
+        data_paths=output_processed_path+"/*.json",
+        output_path=dynamic_segment_path
     )
+    pass
