@@ -5,32 +5,18 @@ from tqdm import tqdm
 from peft import  PeftModel
 from os.path import join as osp
 sys.path.append('../utils')
-from utils import phase2num, load_json, save_json, get_question_prompt_vehicle_view, get_rewrite_prompt_vehicle_view     
+from utils import load_json, save_json, get_question_prompt_overhead_view, get_rewrite_prompt_overhead_view     
 from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
 
-def convert_dict(data):
-    for k, v in data.items():
-        new_v = dict()
-        if v is not None:
-            for v_k, v_v in v.items():
-                if not v_k.isdigit():
-                    new_v[phase2num[v_k]] = v_v
-                else:
-                    new_v[v_k] = v_v
-            data[k] = new_v
-        else:
-            data[k] = v
-    return data
-
 def main(args):
-    ckpt = load_json(args.ckpt_path)['internal']['vehicle_view']
+    ckpt = load_json(args.ckpt_path)['internal']['overhead_view']
     type = args.type
     root = '../../dataset'
-    root_output_dir = '../../aux_dataset/extracted_frames/internal/vehicle_view'
+    root_output_dir = '../../aux_dataset/extracted_frames/internal/overhead_view'
     
     os.makedirs(f'../../aux_dataset/results/{type}', exist_ok=True)
     os.makedirs(f'../../aux_dataset/results/{type}/internal', exist_ok=True)
-    os.makedirs(f'../../aux_dataset/results/{type}/internal/vehicle_view', exist_ok=True)
+    os.makedirs(f'../../aux_dataset/results/{type}/internal/overhead_view', exist_ok=True)
     
     # Video frame properties
     width = 1920
@@ -59,91 +45,111 @@ def main(args):
                 data_type_result = {}
                 if data_type == 'pedes':
                     for segment_type_ in ['appearance', 'environment', 'location', 'attention']:
-                        data_type_result[segment_type_] = convert_dict(load_json(f"../../aux_dataset/results/{type}/internal/vehicle_view/pedes_{segment_type_}.json"))
+                        data_type_result[segment_type_] = load_json(f"../../aux_dataset/results/{type}/internal/overhead_view/pedes_{segment_type_}.json")
                 else:
                     for segment_type_ in ['appearance', 'environment', 'location', 'action']:
-                        data_type_result[segment_type_] = convert_dict(load_json(f"../../aux_dataset/results/{type}/internal/vehicle_view/vehicle_{segment_type_}.json"))
+                        data_type_result[segment_type_] = load_json(f"../../aux_dataset/results/{type}/internal/overhead_view/vehicle_{segment_type_}.json")
 
-            print(f"Start inference data for vehicle view of internal dataset: {type} set - {data_type} - {segment_type}")
+            print(f"Start inference data for overhead view of internal dataset: {type} set - {data_type} - {segment_type}")
             anno_root = osp(root, 'annotations')
             video_roots = [osp(root, f'videos/{type}'), osp(root, f'videos/{type}/normal_trimmed')]
             caption_anno_roots = [osp(anno_root, f'caption/{type}'), osp(anno_root, f'caption/{type}/normal_trimmed')]
-            bbox_anno_roots = [osp(anno_root, f'bbox_annotated', 'pedestrian', type), osp(anno_root, f'bbox_annotated', 'pedestrian', type, 'normal_trimmed')]
+            bbox_anno_root_pedestrians = [osp(anno_root, f'bbox_annotated', 'pedestrian', type), osp(anno_root, f'bbox_annotated', 'pedestrian', type, 'normal_trimmed')]
+            bbox_anno_root_vehicles = [osp(anno_root, f'bbox_annotated', 'vehicle', type), osp(anno_root, f'bbox_annotated', 'vehicle', type, 'normal_trimmed')]
             output_dir = osp(root_output_dir, type)
             
             final_result = dict()
-            for caption_anno_root, bbox_anno_root, video_root in zip(caption_anno_roots, bbox_anno_roots, video_roots):
+            for caption_anno_root, bbox_anno_root_pedestrian, bbox_anno_root_vehicle, video_root in zip(caption_anno_roots, bbox_anno_root_pedestrians, bbox_anno_root_vehicles, video_roots):
                 video_paths = os.listdir(video_root)
                 for video_name in tqdm(video_paths):
                     try:
-                        caption_anno = load_json(osp(caption_anno_root, video_name, 'vehicle_view', video_name) + '_caption.json')
+                        caption_anno = load_json(osp(caption_anno_root, video_name, 'overhead_view', video_name) + '_caption.json')
                     except:
                         print(f'Error loading caption json for {video_name}')
                         continue
                     
-                    try:
-                        bounding_box_anno = load_json(osp(bbox_anno_root, video_name, 'vehicle_view', video_name + '_vehicle_view_bbox.json'))['annotations']
-                    except:
-                        print(f'Error loading bounding box json for {video_name}')
-                        continue
-                    
-                    # Process phase bounding box
-                    bounding_box_dict = dict()
-                    for bb in bounding_box_anno:
-                        phase_number = str(bb['phase_number'])
-                        bounding_box_dict[phase_number] = bb
+                    overhead_videos = caption_anno['overhead_videos']
+                    for overhead_video in overhead_videos:
+                        overhead_video_prefix = overhead_video[:-4]
+                        try:
+                            bbox_pedestrian = load_json(osp(bbox_anno_root_pedestrian, video_name, 'overhead_view', overhead_video_prefix + '_bbox.json'))['annotations']
+                            bbox_vehicle = load_json(osp(bbox_anno_root_vehicle, video_name, 'overhead_view', overhead_video_prefix + '_bbox.json'))['annotations']
+                        except:
+                            print(f"No bounding box annotation match for {video_name}-{overhead_video_prefix}")
+                            continue
+                        
+                        bbox_pedestrian_dict = dict()
+                        for bb in bbox_pedestrian:
+                            phase_number = str(bb['phase_number'])
+                            bbox_pedestrian_dict[phase_number] = bb
+                        
+                        bbox_vehicle_dict = dict()
+                        for bb in bbox_vehicle:
+                            phase_number = str(bb['phase_number'])
+                            bbox_vehicle_dict[phase_number] = bb
 
-                    # Process phase annotation
-                    phase_captions = dict()
-                    for e in caption_anno['event_phase']:
-                        if e['labels'][0].isdigit():
+                        phase_captions = dict()
+                        for e in caption_anno['event_phase']:
                             phase_number = str(e['labels'][0])
-                        else:
-                            phase_number = phase2num[e['labels'][0]]
-                        
-                        if bounding_box_dict.get(phase_number, False):
-                            phase_captions[phase_number] = dict(start_time=float(e['start_time']),
-                                                                end_time=float(e['end_time']),
-                                                                bbox=bounding_box_dict[phase_number]['bbox'],
-                                                                frame_id=bounding_box_dict[phase_number]['image_id'])
+                            if bbox_pedestrian_dict.get(phase_number, False) and bbox_vehicle_dict.get(phase_number, False) and (bbox_pedestrian_dict[phase_number]['image_id'] == bbox_vehicle_dict[phase_number]['image_id']):
+                                phase_captions[phase_number] = dict(start_time=float(e['start_time']),
+                                                                    end_time=float(e['end_time']),
+                                                                    bbox_pedestrian=bbox_pedestrian_dict[phase_number]['bbox'],
+                                                                    bbox_vehicle=bbox_vehicle_dict[phase_number]['bbox'],
+                                                                    frame_id=bbox_pedestrian_dict[phase_number]['image_id'])
 
-                    video_result = dict()
-                    for phase_number, phase_anno in phase_captions.items():                    
-                        image_path = osp(output_dir, video_name, str(phase_anno['frame_id']) + '.png')
-                        (x,y,w,h) = phase_anno['bbox']
-                        
-                        # normalized x, y
-                        x1, y1, x2, y2 = x, y, x+w, y+h
-                        x1 = int((x1/width)*1000)
-                        y1 = int((y1/height)*1000)
-                        x2 = int((x2/width)*1000)
-                        y2 = int((y2/height)*1000)
-
-                        bbox_prompt = f"({str(x1)},{str(y1)}),({str(x2)},{str(y2)})"
-
-                        if segment_type != 'rewrite':
-                            sys_prompt = "Considering you are a driver and you are looking from the vehicle's third person view."
-                            question_prompt = get_question_prompt_vehicle_view(image_path, bbox_prompt, segment_type, sys_prompt)
-                            response, _ = model.chat(tokenizer, query=question_prompt, history=None)
-                            video_result[phase_number] = {f'{segment_type}': response.strip()}
-                        else:
-                            rewrite_information_dict = dict()
-                            for segment_type_ in data_type_result.keys():
-                                rewrite_information_dict[segment_type_] = data_type_result[segment_type_][video_name][phase_number][segment_type_]
-                            question_prompt = get_rewrite_prompt_vehicle_view(image_path, bbox_prompt, rewrite_information_dict, data_type)
-                            response, _ = model.chat(tokenizer, query=question_prompt, history=None)
+                        video_result = dict()
+                        for phase_number, phase_anno in phase_captions.items():                    
+                            image_path = osp(output_dir, video_name, overhead_video_prefix, str(phase_anno['frame_id']) + '.png')
+                            if not os.path.exists(image_path):
+                                print(f'Not found {image_path}')
+                                continue
                             
-                            if data_type == 'pedes':
-                                video_result[phase_number] = {f'caption_pedestrian': response.strip()}
+                            # normalized x, y
+                            x, y, w, h = phase_anno['bbox_pedestrian']
+                            x1, y1, x2, y2 = x, y, x+w, y+h
+                            x1_p = int((x1/width)*1000)
+                            y1_p = int((y1/height)*1000)
+                            x2_p = int((x2/width)*1000)
+                            y2_p = int((y2/height)*1000)
+
+                            # normalized x, y
+                            x, y, w, h = phase_anno['bbox_vehicle']
+                            x1, y1, x2, y2 = x, y, x+w, y+h
+                            x1_v = int((x1/width)*1000)
+                            y1_v = int((y1/height)*1000)
+                            x2_v = int((x2/width)*1000)
+                            y2_v = int((y2/height)*1000)
+
+                            bbox_prompt_pedes = f"({str(x1_p)},{str(y1_p)}),({str(x2_p)},{str(y2_p)})"
+                            bbox_prompt_vehicle = f"({str(x1_v)},{str(y1_v)}),({str(x2_v)},{str(y2_v)})"
+
+                            if segment_type != 'rewrite':
+                                sys_prompt = "Considering you are a driver and you are looking from the vehicle's third person view."
+                                question_prompt = get_question_prompt_overhead_view(image_path, (bbox_prompt_pedes, bbox_prompt_vehicle), segment_type, sys_prompt)
+                                response, _ = model.chat(tokenizer, query=question_prompt, history=None)
+                                video_result[phase_number] = {f'{segment_type}': response.strip()}
                             else:
-                                video_result[phase_number] = {f'caption_vehicle': response.strip()}
-                    
-                    final_result[video_name] = video_result
+                                rewrite_information_dict = dict()
+                                for segment_type_ in data_type_result.keys():
+                                    rewrite_information_dict[segment_type_] = data_type_result[segment_type_][video_name][overhead_video][phase_number][segment_type_]
+                                    
+                                question_prompt = get_rewrite_prompt_overhead_view(image_path, (bbox_prompt_pedes, bbox_prompt_vehicle), rewrite_information_dict, data_type)
+                                response, _ = model.chat(tokenizer, query=question_prompt, history=None)
+                                
+                                if data_type == 'pedes':
+                                    video_result[phase_number] = {f'caption_pedestrian': response.strip()}
+                                else:
+                                    video_result[phase_number] = {f'caption_vehicle': response.strip()}
+                                    
+                        if not final_result.get(video_name, False):
+                            final_result[video_name] = dict()
+                        final_result[video_name][overhead_video] = video_result
                     break
                 break
             
             # Save to result to json file
-            save_json(f'../../aux_dataset/results/{type}/internal/vehicle_view/{data_type}_{segment_type}.json', final_result)
+            save_json(f'../../aux_dataset/results/{type}/internal/overhead_view/{data_type}_{segment_type}.json', final_result)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

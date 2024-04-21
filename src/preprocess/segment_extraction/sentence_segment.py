@@ -9,7 +9,7 @@ from os.path import join as osp
 import json
 import statistics
 import requests
-PROJECT_ROOT = ''
+from constant import *
 
 import torch
 import torch.nn.functional as F
@@ -23,256 +23,10 @@ import re
 import spacy
 from sentence_transformers import SentenceTransformer
 
-class SimSegment:
-    def __init__(
-            self,
-            pedestrian_instruction = {
-                'task': 'Given a query about a pedestrian/person/man/male/female in a street, retrieve the most relevant document that answer the query',
-                'appearance': "Describe the pedestrian/person/man/male/female appearance/out-look include pedestrian's clothes, age, height",
-                'location':"Describe the the location of the pedestrian/person in the street, standing location, relative position to other object in the street",
-                'environment': "Describe the environment arround include the weather, road, traffic, street",
-                'attention': "What is the person/pedestrian attend/looking/focus/watch at",
-                "action": "what is the action of the pedestriand/person in the street", 
-            },
-            vehical_instruction = {
-                'task': 'Given a query about vehicle or pedestrian, retrieve the most relevant document that answer the query',
-                'appearance': "Describe the pedestrian, person, vehicle appearance/look-like include pedestrian's clothes, age, height",
-                'location':"Describe the the location of the pedestrian in the street, standing location, relative position to other object in the street",
-                'environment': "Describe the environment arround include the weather, road, traffic, street",
-                'attention': "What is the vehicle doing attend/view/look",
-                "action": "what is the vehicle doing (moving, go, turn) in the street",
-            },
-            model='intfloat/e5-mistral-7b-instruct',
-            dict_mapping = {
-                0: 'appearance',
-                1: 'location',
-                2: 'environment',
-                3: 'attention',
-                4: 'action',
-            },
-            load_embed_vector = False,
-    ):
-        self.pedestrian_instruction = pedestrian_instruction
-        self.vehical_instruction = vehical_instruction
-        self.dict_mapping = dict_mapping
-        self.tokenizer = AutoTokenizer.from_pretrained(model, device_map='cuda')
-        self.model = AutoModel.from_pretrained(model, device_map='cuda')
-
-    def __call__(self, data_path, output_path=None):
-        self.dataloading(data_path)
-        # self.processing(output_path)
-                
-    def last_token_pool(
-            self, 
-            last_hidden_states: Tensor,
-            attention_mask: Tensor
-        ) -> Tensor:
-        left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
-        if left_padding:
-            return last_hidden_states[:, -1]
-        else:
-            sequence_lengths = attention_mask.sum(dim=1) - 1
-            batch_size = last_hidden_states.shape[0]
-            return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
-    
-    def get_detailed_instruct(self, task_description: str, query: str) -> str:
-        return f'Instruct: {task_description}\nQuery: {query}'
-
-    def get_sentences_embedding(self, sentences:List[str], max_length = 128, batch_process = 1)->torch.Tensor:
-        batch_dict = self.tokenizer(sentences, max_length=max_length - 1, return_attention_mask=False, padding=False, truncation=True)
-        batch_dict['input_ids'] = [input_ids + [self.tokenizer.eos_token_id] for input_ids in batch_dict['input_ids']]
-        # split into chunk to feed for LLM
-        batch_chunks = [batch_dict['input_ids'][i:i + batch_process] for i in range(0, len(batch_dict['input_ids']), batch_process)]
-        embedding_list = []
-        for chunk in batch_chunks:
-            batch_chunk = self.tokenizer.pad({'input_ids':chunk}, padding=True, return_attention_mask=True, return_tensors='pt').to('cuda')
-            with torch.no_grad():
-                outputs = self.model(**batch_chunk)
-            embeddings = self.last_token_pool(outputs.last_hidden_state, batch_chunk['attention_mask'])
-            embedding_list.append(embeddings)
-        embeddings = torch.concat(embedding_list, dim=0)
-        embeddings = F.normalize(embeddings, p=2, dim=-1)
-        return embeddings.detach().cpu()
-    
-    def split_sentence(self, sentence:str)->List[str]:
-        result = []
-        chunks = re.split(', |\.', sentence)
-        for chunk in chunks:
-            text = " ".join(chunk.split())
-            if text != '':
-                result.append(text)
-        return result
-    
-    def dataloading(self, file_path='data/wts_dataset_zip/annotations/caption/train/*/*/*.json', max_length = 128, batch_process_size = 1):
-        print('Running embedding instruction !')
-        vehicle_detail_instruction = [self.get_detailed_instruct(self.vehical_instruction['task'], describe) for describe in list(self.vehical_instruction.values())[1:]]
-        pedestrian_detail_instruction = [self.get_detailed_instruct(self.pedestrian_instruction['task'], describe) for describe in list(self.pedestrian_instruction.values())[1:]]
-        self.vehicle_instruction_embeddings = self.get_sentences_embedding(vehicle_detail_instruction)
-        self.pedestrian_detail_embeddings = self.get_sentences_embedding(pedestrian_detail_instruction)
-
-        self.file_paths = glob(os.path.join(PROJECT_ROOT, file_path))
-        output_dir = '/home/server1-ailab/Desktop/Khai/CVPRW/sentence-segmentation/segment'
-        print('Running embedding sentence piece ! Processing each file')
-        for path in tqdm(self.file_paths):
-            with open(path, 'r') as f:
-                data = json.load(f)
-            video_name = path.split('/')[-1].split('_')[0]
-            for phase in data['event_phase']:
-                # split sentence by '.' and ','
-                piece_caption_pedestrian = self.split_sentence(phase['caption_pedestrian'])
-                piece_caption_vehicle = self.split_sentence(phase['caption_vehicle'])
-                phase['captions_pedestrian_piece'] = piece_caption_pedestrian
-                phase['captions_vehicle_piece'] = piece_caption_vehicle
-
-                caption_pedestrian_piece_embeds = self.get_sentences_embedding(piece_caption_pedestrian)
-                caption_vehicle_piece_embeds = self.get_sentences_embedding(piece_caption_vehicle)
-                
-                pedestrian_segment = self.similarity_function(caption_pedestrian_piece_embeds.cpu(), self.pedestrian_detail_embeddings.cpu())
-                vehicle_segment = self.similarity_function(caption_vehicle_piece_embeds.cpu(), self.vehicle_instruction_embeddings.cpu())
-
-                # choose the segment type has highest score (apearance, action, environment,...)
-                pedestrian_sentence_segment_index = torch.argmax(pedestrian_segment, dim=-1)
-                vehicle_sentence_segment_index = torch.argmax(vehicle_segment, dim=-1)
-
-                # adding pedestrian data
-                pedestrian_segment_result = {
-                    'appearance':[],
-                    'location':[],
-                    'environment':[],
-                    'attention':[],
-                    'action':[]
-                }
-                last_piece_type = ""
-                for i, index in enumerate(pedestrian_sentence_segment_index):
-                    segment_type = self.dict_mapping[index.item()]
-                    pedestrian_sentence_piece = phase['captions_pedestrian_piece'][i]
-                    if last_piece_type != segment_type:
-                        pedestrian_segment_result[segment_type].append(pedestrian_sentence_piece)
-                    else:
-                        pedestrian_segment_result[segment_type][-1] += ", " + pedestrian_sentence_piece
-                    last_piece_type = segment_type
-                
-                # adding vehicle data
-                vehicle_segment_result = {
-                    'appearance':[],
-                    'location':[],
-                    'environment':[],
-                    'attention':[],
-                    'action':[]
-                }
-                last_piece_type = ""
-                for i, index in enumerate(vehicle_sentence_segment_index):
-                    segment_type = self.dict_mapping[index.item()]
-                    vehicle_sentence_piece = phase['captions_vehicle_piece'][i]
-                    if last_piece_type != segment_type:
-                        vehicle_segment_result[segment_type].append(vehicle_sentence_piece)
-                    else:
-                        vehicle_segment_result[segment_type][-1] += ", " + vehicle_sentence_piece
-                    last_piece_type = segment_type
-                    
-                phase['pedestrian_segment_result'] = pedestrian_segment_result
-                phase['vehicle_segment_result'] = vehicle_segment_result
-                phase.pop("caption_pedestrian")
-                phase.pop("caption_vehicle")
-                phase.pop("start_time")
-                phase.pop("end_time")
-
-            os.makedirs(osp(output_dir, video_name), exist_ok=True)
-            with open(f'{osp(output_dir, video_name)}/{video_name}_segment.json', 'w') as f:
-                json.dump(data, f, indent=4)
-            np.save(f'{osp(output_dir, video_name)}/{video_name}_pedes.npy', caption_pedestrian_piece_embeds.cpu().numpy())
-            np.save(f'{osp(output_dir, video_name)}/{video_name}_vehicle.npy', caption_vehicle_piece_embeds.cpu().numpy())
-
-    def processing(self, output_path=None):
-        for path, data in self.meta_data.items():
-            for phase in data['event_phase']:
-                pedestrian_segment = self.similarity_function(phase['caption_pedestrian_piece_embeds'].cpu(), self.pedestrian_detail_embeddings.cpu())
-                vehicle_segment = self.similarity_function(phase['caption_vehicle_piece_embeds'].cpu(), self.vehicle_instruction_embeddings.cpu())
-
-                # choose the segment type has highest score (apearance, action, environment,...)
-                pedestrian_sentence_segment_index = torch.argmax(pedestrian_segment, dim=-1)
-                vehicle_sentence_segment_index = torch.argmax(vehicle_segment, dim=-1)
-
-                # adding pedestrian data
-                pedestrian_segment_result = {
-                    'appearance':[],
-                    'location':[],
-                    'environment':[],
-                    'attention':[],
-                    'action':[]
-                }
-                last_piece_type = ""
-                for i, index in enumerate(pedestrian_sentence_segment_index):
-                    segment_type = self.dict_mapping[index.item()]
-                    pedestrian_sentence_piece = phase['captions_pedestrian_piece'][i]
-                    if last_piece_type != segment_type:
-                        pedestrian_segment_result[segment_type].append(pedestrian_sentence_piece)
-                    else:
-                        pedestrian_segment_result[segment_type][-1] += ", " + pedestrian_sentence_piece
-                    last_piece_type = segment_type
-                
-                # adding vehicle data
-                vehicle_segment_result = {
-                    'appearance':[],
-                    'location':[],
-                    'environment':[],
-                    'attention':[],
-                    'action':[]
-                }
-                last_piece_type = ""
-                for i, index in enumerate(vehicle_sentence_segment_index):
-                    segment_type = self.dict_mapping[index.item()]
-                    vehicle_sentence_piece = phase['captions_vehicle_piece'][i]
-                    if last_piece_type != segment_type:
-                        vehicle_segment_result[segment_type].append(vehicle_sentence_piece)
-                    else:
-                        vehicle_segment_result[segment_type][-1] += ", " + vehicle_sentence_piece
-                    last_piece_type = segment_type
-                    
-                phase['pedestrian_segment_result'] = pedestrian_segment_result
-                phase['vehicle_segment_result'] = vehicle_segment_result
-                phase.pop("caption_pedestrian_piece_embeds")
-                phase.pop("caption_vehicle_piece_embeds")
-
-        if output_path:
-            with open(os.path.join(PROJECT_ROOT, output_path), 'w') as f:
-                json.dump(self.meta_data, f, indent=4)
-
-        return None
-    
-    def prompt_searching(self, instruction, data_path='sentence-segmentation/segment/video5', caption_type = 'pedes'):
-        path = Path("/here/your/path/file.txt")
-        vidieo_name = path.parent.absolute()
-        embed_vector = np.load(osp(data_path, f'{vidieo_name}_{caption_type}.npy'))
-        with open(osp(path, f'{vidieo_name}_segment.json')) as f:
-            captions = json.load(f)["event_phase"]
-        
-    
-    def load_document_embed_vector(self, path='/home/server1-ailab/Desktop/Khai/CVPRW/sentence-segmentation/segment'):
-        pedestrian_caption_embed_paths = glob(osp(path, '*/*_pedes.npy'))
-        vehical_caption_embed_paths = glob(osp(path, '*/*_vehicle.npy'))
-        
-        embed_pedestrian_list = []
-        embed_vehicle_list = []
-        for pedes_path, vehicle_path in zip(pedestrian_caption_embed_paths, vehical_caption_embed_paths):
-            embed_pedestrian_list.append(np.load(pedes_path))
-            embed_vehicle_list.append(np.load(vehicle_path))
-        
-        self.embed_pedestrian = np.concatenate(embed_pedestrian_list, axis=0)
-        self.embed_vehicle = np.concatenate(embed_vehicle_list, axis=0)
-        
-        return None
-
-
-    def similarity_function(self, tensor_A:torch.Tensor, tensor_B:torch.Tensor, temperature:int=0.2)->torch.Tensor:
-        consine_sim = tensor_A.matmul(tensor_B.T) / (torch.norm(tensor_A) * torch.norm(tensor_B))
-        return torch.exp(consine_sim/temperature)
-    
 class LLMSegment:
     def __init__(
         self,
         model_name='Qwen/Qwen1.5-7B-Chat',
-        ollama=False,
     ):
         # self.model = AutoModelForCausalLM.from_pretrained(
         #     model_name,
@@ -286,20 +40,18 @@ class LLMSegment:
         # self.model_device = self.model.device
         if not ollama:
             self.sampling_params = SamplingParams(temperature=0.7, top_p=0.85, top_k=3, max_tokens=512)
-            self.model = LLM(model=model_name,
-                            #kv_cache_dtype="fp8_e5m2",
-                            #gpu_memory_utilization=1,
-                            #  quantization="awq",
-                            #  dtype="auto",
-                            #  swap_space=8,
-                            #  gpu_memory_utilization=0.9,
-                            #  max_num_seqs=3,
-                            # dtype='bfloat16'
-                            # max_model_len=10000,
-                            )
-        else:
-            self.url = "http://localhost:11434/api/generate"
-            self.headers = {'Content-Type': 'application/json'}
+            LLM(
+                model=model_name,
+                #kv_cache_dtype="fp8_e5m2",
+                #gpu_memory_utilization=1,
+                #  quantization="awq",
+                #  dtype="auto",
+                #  swap_space=8,
+                #  gpu_memory_utilization=0.9,
+                #  max_num_seqs=3,
+                # dtype='bfloat16'
+                # max_model_len=10000,
+            )
         
     # def __call__(self, file_path, output_path):
     #     os.makedirs(output_path, exist_ok=True)

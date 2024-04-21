@@ -8,20 +8,6 @@ sys.path.append('../utils')
 from utils import phase2num, load_json, save_json, get_question_prompt_vehicle_view, get_rewrite_prompt_vehicle_view     
 from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
 
-def convert_dict(data):
-    for k, v in data.items():
-        new_v = dict()
-        if v is not None:
-            for v_k, v_v in v.items():
-                if not v_k.isdigit():
-                    new_v[phase2num[v_k]] = v_v
-                else:
-                    new_v[v_k] = v_v
-            data[k] = new_v
-        else:
-            data[k] = v
-    return data
-
 def main(args):
     ckpt = load_json(args.ckpt_path)['internal']['vehicle_view']
     type = args.type
@@ -59,10 +45,10 @@ def main(args):
                 data_type_result = {}
                 if data_type == 'pedes':
                     for segment_type_ in ['appearance', 'environment', 'location', 'attention']:
-                        data_type_result[segment_type_] = convert_dict(load_json(f"../../aux_dataset/results/{type}/internal/vehicle_view/pedes_{segment_type_}.json"))
+                        data_type_result[segment_type_] = load_json(f"../../aux_dataset/results/{type}/internal/vehicle_view/pedes_{segment_type_}.json")
                 else:
                     for segment_type_ in ['appearance', 'environment', 'location', 'action']:
-                        data_type_result[segment_type_] = convert_dict(load_json(f"../../aux_dataset/results/{type}/internal/vehicle_view/vehicle_{segment_type_}.json"))
+                        data_type_result[segment_type_] = load_json(f"../../aux_dataset/results/{type}/internal/vehicle_view/vehicle_{segment_type_}.json")
 
             print(f"Start inference data for vehicle view of internal dataset: {type} set - {data_type} - {segment_type}")
             anno_root = osp(root, 'annotations')
@@ -139,8 +125,6 @@ def main(args):
                                 video_result[phase_number] = {f'caption_vehicle': response.strip()}
                     
                     final_result[video_name] = video_result
-                    break
-                break
             
             # Save to result to json file
             save_json(f'../../aux_dataset/results/{type}/internal/vehicle_view/{data_type}_{segment_type}.json', final_result)

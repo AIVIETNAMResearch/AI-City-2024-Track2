@@ -98,7 +98,9 @@ sh tools/inference.sh
 The pretrained checkpoints are listed in [here](src/inference/ckpt.json). 
 
 ### Postprocessing
-Updating.
+```
+sh tools/postprocess.sh
+```
 
 ### Evaluation
 We follow [wts-dataset repo](https://github.com/woven-visionai/wts-dataset) and reimplement the fast version at [here](src/evaluation/metrics.py).

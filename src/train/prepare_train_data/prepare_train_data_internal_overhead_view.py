@@ -4,7 +4,7 @@ import argparse
 from tqdm import tqdm
 from os.path import join as osp 
 sys.path.append('../../utils')
-from utils import phase2num, load_json, save_json, get_question_data, get_rewrite_data, longest
+from utils import phase2num, load_json, save_json, get_question_data, get_rewrite_data
 
 def process_information_phases(path):
     information_phases = load_json(path)
@@ -21,12 +21,6 @@ def process_information_phases(path):
             for k, v in information_dict[phase_number][key].items():
                 information_dict[phase_number][key][k] = ' '.join(v).strip()
     return information_dict
-
-def convert_dict(data, type):
-    # Chose the longest  
-    for k, v in data.items():            
-        data[k] = longest(v, type)
-    return data
 
 def main(args):
     type = args.type
@@ -65,12 +59,12 @@ def main(args):
         else:
             pedes_result = {}
             for segment_type in ['appearance', 'environment', 'location', 'attention']:
-                pedes_result[segment_type] = convert_dict(load_json(f"../../../aux_dataset/results/{type}/internal/overhead_view/pedes_{segment_type}.json"), segment_type)
+                pedes_result[segment_type] = load_json(f"../../../aux_dataset/results/{type}/internal/overhead_view/pedes_{segment_type}.json")
             rewrite_pedes_data = dict(id=0, data=[])
             
             vehicle_result = {}
             for segment_type in ['appearance', 'environment', 'location', 'action']:
-                vehicle_result[segment_type] = convert_dict(load_json(f"../../../aux_dataset/results/{type}/internal/overhead_view/vehicle_{segment_type}.json"), segment_type)
+                vehicle_result[segment_type] = load_json(f"../../../aux_dataset/results/{type}/internal/overhead_view/vehicle_{segment_type}.json")
             rewrite_vehicle_data = dict(id=0, data=[])
             
         for caption_anno_root, bbox_anno_root_pedestrian, bbox_anno_root_vehicle, video_root in zip(caption_anno_roots, bbox_anno_root_pedestrians, bbox_anno_root_vehicles, video_roots):
@@ -127,10 +121,6 @@ def main(args):
                                                                 frame_id=bbox_pedestrian_dict[phase_number]['image_id'])
                 
                     for phase_number, phase_anno in phase_captions.items():
-                        if args.choice == 'rewrite':
-                            if pedes_result['location'][video_name][phase_number] is None:
-                                continue
-                        
                         image_path = osp(output_dir, video_name, overhead_video_prefix, str(phase_anno['frame_id']) + '.png')
                         if not os.path.exists(image_path):
                             print(f'Not found {image_path}')
@@ -175,28 +165,28 @@ def main(args):
                         else:
                             rewrite_information_pedes_dict = dict()
                             for segment_type in pedes_result.keys():               
-                                rewrite_information_pedes_dict[segment_type] = pedes_result[segment_type][video_name][phase_number][segment_type]
+                                rewrite_information_pedes_dict[segment_type] = pedes_result[segment_type][video_name][overhead_video][phase_number][segment_type]
                                 
                             rewrite_information_vehicle_dict = dict()
                             for segment_type in vehicle_result.keys():               
-                                rewrite_information_vehicle_dict[segment_type] = vehicle_result[segment_type][video_name][phase_number][segment_type]
+                                rewrite_information_vehicle_dict[segment_type] = vehicle_result[segment_type][video_name][overhead_video][phase_number][segment_type]
                             
                             rewrite_pedes_data['data'].append(get_rewrite_data(id=rewrite_pedes_data['id'],
-                                                                                            image_path=image_path, 
-                                                                                            bbox_prompt=(bbox_prompt_pedes, bbox_prompt_vehicle), 
-                                                                                            data=rewrite_information_pedes_dict, 
-                                                                                            data_type='pedes', 
-                                                                                            response=phase_anno['caption_pedestrian'],
-                                                                                            view='overhead_view'))
+                                                                               image_path=image_path, 
+                                                                               bbox_prompt=(bbox_prompt_pedes, bbox_prompt_vehicle), 
+                                                                               data=rewrite_information_pedes_dict, 
+                                                                               data_type='pedes', 
+                                                                               response=phase_anno['caption_pedestrian'],
+                                                                               view='overhead_view'))
                             rewrite_pedes_data['id'] += 1
                             
                             rewrite_vehicle_data['data'].append(get_rewrite_data(id=rewrite_vehicle_data['id'],
-                                                                                            image_path=image_path, 
-                                                                                            bbox_prompt=(bbox_prompt_pedes, bbox_prompt_vehicle), 
-                                                                                            data=rewrite_information_vehicle_dict, 
-                                                                                            data_type='vehicle', 
-                                                                                            response=phase_anno['caption_vehicle'],
-                                                                                            view='overhead_view'))
+                                                                                 image_path=image_path, 
+                                                                                 bbox_prompt=(bbox_prompt_pedes, bbox_prompt_vehicle), 
+                                                                                 data=rewrite_information_vehicle_dict, 
+                                                                                 data_type='vehicle', 
+                                                                                 response=phase_anno['caption_vehicle'],
+                                                                                 view='overhead_view'))
                             rewrite_vehicle_data['id'] += 1
                         
             if args.choice == 'segment':

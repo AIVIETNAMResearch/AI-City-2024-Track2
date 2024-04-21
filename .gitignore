@@ -1,4 +1,9 @@
 dataset/
-aux_dataset/
+aux_dataset/extracted_frames/
+aux_dataset/results/
+aux_dataset/segmentation_data/
+aux_dataset/submission/
+aux_dataset/train_data/
 __pycache__/
 SimSun.ttf
+constant.py

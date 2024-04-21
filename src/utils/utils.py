@@ -36,6 +36,23 @@ def longest(data, type):
                 processed_data[phase_number] = {f"{type}": data[video_name][phase_number][type]}
     return processed_data
 
+def fill_video(data):
+    # Some video phase may have no people instance to be caption
+    # So we use the result from other phases 
+    non_none_positions = {int(key): data[key] for key in data if data[key] is not None}
+    non_none_keys = sorted(non_none_positions.keys())
+
+    # Function to find the closest non-None key
+    def find_closest_non_none(position):
+        closest_key = min(non_none_keys, key=lambda k: abs(k - position))
+        return non_none_positions[closest_key]
+
+    for key in list(data.keys()):
+        if data[key] is None:
+            data[key] = find_closest_non_none(int(key))
+
+    return data
+
 def get_question_prompt_vehicle_view(image_path, bbox_prompt, segment_type, sys_prompt):
     if segment_type == 'appearance':
         question = "Describe the pedestrian appearance including their clothing, height and age."
