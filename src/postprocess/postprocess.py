@@ -4,7 +4,7 @@ from utils import load_json, save_json, fill_video, longest
 
 print('Perform postprocessing')
 # External
-pedes_rewrite_external = load_json('../../aux_dataset/results/test/external/pedes_rewrite_50%.json')
+pedes_rewrite_external = load_json('../../aux_dataset/results/test/external/pedes_rewrite.json')
 
 vehicle_rewrite_external = {}
 vehicle_segment_external = {}

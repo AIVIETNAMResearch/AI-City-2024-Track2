@@ -82,12 +82,8 @@ class LLMSegment:
             for phase in phases:
                 pedes_captions.append(self.get_prompt(phase['caption_pedestrian'], input_type='pedes'))
                 vehicle_captions.append(self.get_prompt(phase['caption_vehicle'], input_type='vehicle'))
-            if self.ollama:
-                pedes_informations = self.ollama_generate(pedes_captions)
-                vehicle_informations = self.ollama_generate(vehicle_captions)
-            else:
-                pedes_informations = self.get_information_vllm(pedes_captions)
-                vehicle_informations = self.get_information_vllm(vehicle_captions)
+            pedes_informations = self.get_information_vllm(pedes_captions)
+            vehicle_informations = self.get_information_vllm(vehicle_captions)
             for phase, pedes_information, vehicle_information in zip(phases, pedes_informations, vehicle_informations):
                 phase['pesdes_info'] = pedes_information
                 phase['vehicle_info'] = vehicle_information

@@ -26,20 +26,23 @@ The 2nd Place Solution to The 8th NVIDIA AI City Challenge (2024) Track 2
 │   |   ├── extract_frames
 │   |   ├── segment_extraction
 │   ├── train
-│   |   ├── prepare_train_data
 │   |   ├── Qwen-VL
+│   |   ├── prepare_train_data
 │   ├── inference
 │   ├── postprocess
 │   ├── evaluation
+├── tools
 ├── aux_dataset
+│   ├── results
+│   ├── submission
+│   ├── train_data
 │   ├── extracted_frames
 │   ├── segmentation_data
-│   ├── train_data
-│   ├── results
 ├── dataset
 ```
 
 ### Data Structure
+Please download [WTS dataset](https://github.com/woven-visionai/wts-dataset) and set up the dataset as follow:
 ```
 ├── dataset
 │   ├── annotations
