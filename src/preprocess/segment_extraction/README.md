@@ -12,3 +12,8 @@ pip install flash-attn --no-build-isolation
 ```
 export HF_TOKEN="put your hf token here"
 ```
+
+# Run the file
+```
+python src\preprocess\segment_extraction\sentence_segment.py
+```
