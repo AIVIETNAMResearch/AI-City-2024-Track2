@@ -1,4 +1,5 @@
 # AICITY2024 Track 2 - Code from AIO_ISC Team
+[Khai Trinh Xuan](https://github.com/trinhxuankhai), [Khoi Nguyen Nguyen](https://github.com/nguyen-brat), [Bach Hoang Ngo](https://github.com/BachNgoH), [Vu Dinh Xuan](https://github.com/dxv2k), [Minh-Hung An](https://github.com/anminhhung)
 
 The 2nd Place Solution to The 8th NVIDIA AI City Challenge (2024) Track 2
 <p align="center">
