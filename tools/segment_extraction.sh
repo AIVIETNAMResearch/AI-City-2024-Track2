@@ -1,0 +1,2 @@
+cd src/preprocess/segment_extraction
+python sentence_segment.py

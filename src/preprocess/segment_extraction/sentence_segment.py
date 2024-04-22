@@ -1,29 +1,24 @@
-from pathlib import Path
-from glob import glob
+import os
 import re
+import json
+import spacy
+import random
+import argparse
+import statistics
+from glob import glob
 from tqdm import tqdm
 from typing import List
-import os
-import random
 from os.path import join as osp
-import json
-import statistics
-import requests
-import spacy
 
 import torch
 import torch.nn.functional as F
-from torch import Tensor
-from transformers import AutoModel, AutoConfig, AutoTokenizer, AutoModelForCausalLM
+
 from vllm import LLM, SamplingParams
-import numpy as np
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from torcheval.metrics.functional.text import bleu_score
 
 import re
 from sentence_transformers import SentenceTransformer
-
-from huggingface_hub import login
-login(token=os.environ.get("HF_TOKEN"))
 class LLMSegment:
     def __init__(
         self,
@@ -64,7 +59,7 @@ class LLMSegment:
             random.shuffle(file_paths)
         num_run_sample = int(len(file_paths)*run_percentage)
         for path in tqdm(file_paths[:num_run_sample]):
-            video_name = path.split('/')[-1].split('_')[0]
+            video_name = path.split('/')[-1].replace('_caption.json', '')
             with open(path, 'r') as f:
                 phases = json.load(f)["event_phase"]
             pedes_captions = []
@@ -118,7 +113,7 @@ class LLMSegment:
         pedes_keys_name = ['appearance', 'location', 'environment', 'attention']
         vehicle_keys_name = ['appearance', 'location', 'environment', 'action']
         for path in folder_paths:
-            video_name = path.split('/')[-1].split('_')[0]
+            video_name = path.split('/')[-1].replace('_information.json', '')
             error_result = []
             with open(path, 'r') as f:
                 phases = json.load(f)
@@ -373,7 +368,6 @@ class DynamicSentenceSegmentation:
         self.model = SentenceTransformer(model_name)
         self.nlp = spacy.load("en_core_web_sm")
     
-    
     def __call__(
         self,
         data_paths,
@@ -382,7 +376,7 @@ class DynamicSentenceSegmentation:
         os.makedirs(output_path, exist_ok=True)
         data_paths = glob(data_paths)
         for data_path in tqdm(data_paths):
-            video_name = data_path.split('/')[-1].split('_')[0]
+            video_name = data_path.split('/')[-1].replace('_information.json', '')
             with open(data_path, 'r') as f:
                 phases = json.load(f)
             for phase in phases:
@@ -466,7 +460,7 @@ class DynamicSentenceSegmentation:
             if word.text == 'and':
                 chunks.append([])
             else:
-              chunks[-1].append(word)
+                chunks[-1].append(word)
             #chunks[-1].append(word)
         return main_subjects, nouns, chunks
 
@@ -487,24 +481,58 @@ class DynamicSentenceSegmentation:
         Only apply (1, d) (1, d) tensor
         '''
         return F.cosine_similarity(tensorA, tensorB).item()
+
+def run_extraction(data_path, output_folder, pre_segment, dynamic_segment, post_fix=""):
+    output_raw_path = osp(output_folder, 'raw_2' + post_fix)
+    output_processed_path = osp(output_folder, 'processed_2' + post_fix)
+    dynamic_segment_path = osp(output_folder, 'post_processed_2' + post_fix)
     
-if __name__ == "__main__":
-    pre_segment = LLMSegment(model_name = "mistralai/Mistral-7B-Instruct-v0.2", use_vllm=True)
-    data_path = '/home/genai48gb/Desktop/AI-City-2024-Track2/dataset/external/BDD_PC_5K/annotations/caption/train/*.json'
-    output_raw_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test"
-    output_processed_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test_2"
-    error_tracking_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/error_test" # could be not set or leave to none
-    dynamic_segment_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test_3"
-    pre_segment(data_path=data_path, output_path=output_raw_path, run_percentage=0.01)
+    ## Run pre segment
+    pre_segment(data_path=data_path, output_path=output_raw_path, run_percentage=1)
     LLMSegment.information_spliter(
         file_paths=output_raw_path + "/*.json",
-        output_path=output_processed_path,
-        error_folder=error_tracking_path
+        output_path=output_processed_path
     )
-    LLMSegment.check_acc(output_processed_path + '/*.json')
-    dynamic_sengment = DynamicSentenceSegmentation()
-    dynamic_sengment(
+
+    ## Check accuracy if needed
+    # LLMSegment.check_acc(output_processed_path + '/*.json')
+    
+    ## Run dynamic segment
+    dynamic_segment(
         data_paths=output_processed_path+"/*.json",
         output_path=dynamic_segment_path
     )
-    pass
+
+def main(args):
+    type = args.type
+    output_folder = f"../../../aux_dataset/segmentation_data/mistral/{type}"
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # Load pre segment model
+    pre_segment = LLMSegment(model_name = "mistralai/Mistral-7B-Instruct-v0.2", use_vllm=True)
+    # Load dynamic segment model
+    dynamic_segment = DynamicSentenceSegmentation()
+    
+    # External
+    print(f"Run segment extraction for external dataset - {type} set")
+    data_path_external = f'../../../dataset/external/BDD_PC_5K/annotations/caption/{type}/*.json'
+    output_folder_external = osp(output_folder, 'external')
+    os.makedirs(output_folder_external, exist_ok=True)
+    
+    run_extraction(data_path_external, output_folder_external, pre_segment, dynamic_segment)
+    
+    # Internal
+    print(f"Run segment extraction for internal dataset - {type} set")
+    data_path_internal_not_trim = f'../../../dataset/annotations/caption/{type}/*/overhead_view/*.json'
+    data_path_internal_trim = f'../../../dataset/annotations/caption/{type}/normal_trimmed/*/overhead_view/*.json'
+    output_folder_internal = osp(output_folder, 'internal')
+    os.makedirs(output_folder_internal, exist_ok=True)
+        
+    run_extraction(data_path_internal_not_trim, output_folder_internal, pre_segment, dynamic_segment)
+    run_extraction(data_path_internal_trim, output_folder_internal, pre_segment, dynamic_segment, "_normal_trimmed")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--type", choices=['train', 'val'], default='train', help='Subset choices')
+    args = parser.parse_args()
+    main(args)

@@ -70,20 +70,19 @@ Please download [WTS dataset](https://github.com/woven-visionai/wts-dataset) and
 ## Environment
 ```
 pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-pip install flash-attn --no-build-isolation
 ```
 
 ## Prepare
+Run the following instructions to create our final submission or you can download our aux_dataset (not including extracted_frames) folder [here](https://drive.google.com/file/d/1o5E1c8ePIW6HtMcVy72PQmrU3z1Mzffb/view?usp=sharing).
 ### Preprocessing
 Extracting video frames:
 ```
 sh tools/extract_frames.sh
 ```
 
-Segment Extraction:
+Segment Extraction: please create a new environment follow [here](src/preprocess/segment_extraction/README.md) and run:
 ```
-Updating
+sh tools/segment_extraction.sh
 ```
 
 ### Training
