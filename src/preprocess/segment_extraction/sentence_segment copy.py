@@ -1,22 +1,19 @@
-from pathlib import Path
-from glob import glob
+import os
 import re
+import json
+import spacy
+import random
+import statistics
+from glob import glob
 from tqdm import tqdm
 from typing import List
-import os
-import random
 from os.path import join as osp
-import json
-import statistics
-import requests
-import spacy
 
 import torch
 import torch.nn.functional as F
-from torch import Tensor
-from transformers import AutoModel, AutoConfig, AutoTokenizer, AutoModelForCausalLM
+
 from vllm import LLM, SamplingParams
-import numpy as np
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from torcheval.metrics.functional.text import bleu_score
 
 import re
@@ -382,7 +379,7 @@ class DynamicSentenceSegmentation:
         os.makedirs(output_path, exist_ok=True)
         data_paths = glob(data_paths)
         for data_path in tqdm(data_paths):
-            video_name = data_path.split('/')[-1].split('_')[0]
+            video_name = data_path.split('/')[-1].replace('_information.json', '')
             with open(data_path, 'r') as f:
                 phases = json.load(f)
             for phase in phases:
@@ -466,7 +463,7 @@ class DynamicSentenceSegmentation:
             if word.text == 'and':
                 chunks.append([])
             else:
-              chunks[-1].append(word)
+                chunks[-1].append(word)
             #chunks[-1].append(word)
         return main_subjects, nouns, chunks
 
@@ -489,22 +486,31 @@ class DynamicSentenceSegmentation:
         return F.cosine_similarity(tensorA, tensorB).item()
     
 if __name__ == "__main__":
+    output_folder = "../../../aux_dataset/segmentation_data_rerun"
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # Load pre segment model
     pre_segment = LLMSegment(model_name = "mistralai/Mistral-7B-Instruct-v0.2", use_vllm=True)
-    data_path = '/home/genai48gb/Desktop/AI-City-2024-Track2/dataset/external/BDD_PC_5K/annotations/caption/train/*.json'
-    output_raw_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test"
-    output_processed_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test_2"
-    error_tracking_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/error_test" # could be not set or leave to none
-    dynamic_segment_path = "/home/genai48gb/Desktop/AI-City-2024-Track2/test_3"
+    # Load dynamic segment model
+    dynamic_segment = DynamicSentenceSegmentation()
+    
+    # External
+    data_path = '../../../dataset/external/BDD_PC_5K/annotations/caption/train/*.json'
+    output_folder_external = osp(output_folder, 'external')
+    os.makedirs(output_folder_external, exist_ok=True)
+    output_raw_path = osp(output_folder_external, 'raw_2')
+    output_processed_path = osp(output_folder_external, 'processed_2')
+    dynamic_segment_path = osp(output_folder_external, 'post_processed_2')
+    
+    ## Run pre segment
     pre_segment(data_path=data_path, output_path=output_raw_path, run_percentage=0.01)
     LLMSegment.information_spliter(
         file_paths=output_raw_path + "/*.json",
-        output_path=output_processed_path,
-        error_folder=error_tracking_path
+        output_path=output_processed_path
     )
-    LLMSegment.check_acc(output_processed_path + '/*.json')
-    dynamic_sengment = DynamicSentenceSegmentation()
-    dynamic_sengment(
+    # LLMSegment.check_acc(output_processed_path + '/*.json')
+    ## Run dynamic segment
+    dynamic_segment(
         data_paths=output_processed_path+"/*.json",
         output_path=dynamic_segment_path
     )
-    pass
