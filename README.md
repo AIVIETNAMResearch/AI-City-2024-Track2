@@ -99,7 +99,7 @@ Inference trained model on test set:
 ```
 sh tools/inference.sh
 ```
-The pretrained checkpoints are listed in [here](src/inference/ckpt.json). 
+The pretrained checkpoints uploaded to huggingface hub are listed in [here](src/inference/ckpt.json). 
 
 ### Postprocessing
 ```
