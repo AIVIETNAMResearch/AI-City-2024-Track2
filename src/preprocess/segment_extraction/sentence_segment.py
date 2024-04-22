@@ -168,11 +168,11 @@ class LLMSegment:
     
     def get_instruction_promt_wo_system_prompt(self, text, input_type):
         if input_type == 'pedes':
-            system_prompt = f'''Imagine you are a driver inside a car, you are looking outside the street through car windshield. Given the description of view in front of you after "# Paragraph:". Your task is to split the given description. You MUST go straight to the answer and answer shortly. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
+            system_prompt = f'''Imagine you are standing on the street with pedestrian and vehicle arround. Given the description of view in front of you after "# Paragraph:". Your task is to split the given description. You MUST go straight to the answer and answer shortly. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
 # Paragraph: street description
 # Answer:
-- appearance: out-look of the pedestrian.
-- location: location of the pedestrian.
+- appearance: out-look of the pedestrian, what is the age, height, clothes, ... of the pedestrian
+- location: location of the pedestrian relative to the vehicle or where is the pedestrian stand.
 - environment: the description of the environment includes weather, light surface, road,...
 - attention: what the pedestrian looking at? Information helps answer whether the pedestrian is aware of the vehicle
 
@@ -212,11 +212,11 @@ class LLMSegment:
             )
             return prompt
         else:
-            system_prompt = f'''Imagine you are a driver inside a car, you are looking outside the street through car windshield. Given the description of view in front of you after "# Paragraph:". Your task is to split the given description. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
+            system_prompt = f'''Imagine you are standing on the street with pedestrian and vehicle arround. Given the description of view in front of you after "# Paragraph:". Your task is to split the given description. Extract these 4 information from the paragraph. Each piece of information could be in a separate place in the paragraph, you MUST use linking words to combine this information but you will be penalized if you paraphrase the information in the given paragraph. If the relevant information is not contained in the graph return NaN. Give an answer in the following format. You will be penalized if answer the wrong format from the above format:
 # Paragraph: street description
 # Answer:
-- appearance: out-look of the pedestrian.
-- location: location of the pedestrian.
+- appearance: out-look of the pedestrian, what is the age, height, clothes, ... of the pedestrian
+- location: location of the pedestrian relative to the vehicle or where is the pedestrian stand.
 - environment: the description of the environment includes weather, light surface, road,...
 - action: speed of the vehicle and the action of the vehicle: direction, go, pass,...
 
