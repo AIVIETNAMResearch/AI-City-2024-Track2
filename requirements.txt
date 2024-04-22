@@ -12,3 +12,10 @@ torchvision
 pillow
 tensorboard
 peft
+setuptools
+wheel
+numpy
+torcheval
+sentence_transformers
+vllm
+spacy

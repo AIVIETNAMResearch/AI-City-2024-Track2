@@ -70,6 +70,8 @@ Please download [WTS dataset](https://github.com/woven-visionai/wts-dataset) and
 ## Environment
 ```
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+pip install flash-attn --no-build-isolation
 ```
 
 ## Prepare
