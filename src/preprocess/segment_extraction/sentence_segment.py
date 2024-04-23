@@ -122,7 +122,7 @@ class LLMSegment:
                 vehicle_info = phase['vehicle_info'].split('[INST]')[0].split('\n')[:4]
                 try:
                     pedes_result = {
-                        key:' '.join(value.split(':')[1:]).strip() for (value, key) in zip(pesdes_info, pedes_keys_name)
+                        key:' '.join(value.split(':')[1:]).strip() for (value, key) in zip(pesdes_info, pedes_keys_name[:len(pesdes_info)])
                     }
                     phase['pedes_detail_extraction'] = pedes_result
                 except:
