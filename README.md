@@ -106,6 +106,7 @@ The pretrained checkpoints uploaded to huggingface hub are listed in [here](src/
 ```
 sh tools/postprocess.sh
 ```
+After run postprocessing, you can submit the file [aux_dataset/submission.json](aux_dataset/submission.json) to the official evaluation server.
 
 ### Evaluation
 We follow [wts-dataset repo](https://github.com/woven-visionai/wts-dataset) and reimplement the fast version at [here](src/evaluation/metrics.py).
