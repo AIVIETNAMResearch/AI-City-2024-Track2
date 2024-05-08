@@ -97,6 +97,7 @@ Segment Extraction: please create a new environment follow [here](src/preprocess
 ```
 sh tools/segment_extraction.sh
 ```
+Remember to grant permisson to access [mistralai/Mistral-7B-Instruct-v0.2](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2) model on the huggingface hub.
 
 ### Training
 Prepare train data:
@@ -122,3 +123,10 @@ After run postprocessing, you can submit the file [aux_dataset/submission.json](
 
 ### Evaluation
 We follow [wts-dataset repo](https://github.com/woven-visionai/wts-dataset) and reimplement the fast version at [here](src/evaluation/metrics.py).
+
+## Docker
+We provide Dockerfile to build Segment Extraction environment :
+```
+sudo docker build -t segment_extraction .
+sudo docker run -it --gpus all -v ./:/home/code -w /home/code segment_extraction
+```
