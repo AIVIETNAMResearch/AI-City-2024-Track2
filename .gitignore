@@ -1,9 +1,7 @@
 dataset/
-aux_dataset/extracted_frames/
-aux_dataset/results/
-aux_dataset/segmentation_data/
-aux_dataset/submission/
-aux_dataset/train_data/
+aux_dataset/*
+!aux_dataset/submission.json
+!aux_dataset/submission_template.json
 aux_dataset.zip
 __pycache__/
 SimSun.ttf

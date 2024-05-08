@@ -65,7 +65,19 @@ Please download [WTS dataset](https://github.com/woven-visionai/wts-dataset) and
 │   |   |   ├── test
 │   |   external
 │   |   |   ├── BDD_PC_5K
-│   |   |   |   ├── ... (same structure)
+│   |   |   |   ├── annotations
+|   |   |   │   |   ├── bbox_annotated
+|   |   │   |   |   |   ├── train
+|   |   │   |   |   |   ├── val
+|   |   │   |   |   |   ├── test
+|   |   |   │   |   ├── bbox_generated
+|   |   │   |   |   ├── ... (same structure)
+|   |   |   │   |   ├── caption
+|   |   │   |   |   ├── ... (same structure)
+│   |   |   |   ├── videos
+│   |   |   |   |   ├── train
+│   |   |   |   |   ├── val
+│   |   |   |   |   ├── test
 ```
 
 ## Environment
