@@ -19,6 +19,10 @@ from torcheval.metrics.functional.text import bleu_score
 
 import re
 from sentence_transformers import SentenceTransformer
+
+from huggingface_hub import login
+login()
+
 class LLMSegment:
     def __init__(
         self,
