@@ -86,7 +86,8 @@ pip install -r requirements.txt
 ```
 
 ## Prepare
-Run the following instructions to create our final submission or you can download our aux_dataset (not including extracted_frames) folder [here](https://drive.google.com/file/d/1o5E1c8ePIW6HtMcVy72PQmrU3z1Mzffb/view?usp=sharing).
+Run the following instructions to create our final submission or you can download our aux_dataset (not including extracted_frames) folder [here](https://drive.google.com/file/d/1o5E1c8ePIW6HtMcVy72PQmrU3z1Mzffb/view?usp=sharing). 
+Inorder to run the repo, the user should use Nvidia GPU which has ampere architecture (rtx 3000 series, A5000, A6000,...) or higher (Hopper, Blackwell).
 ### Preprocessing
 Extracting video frames:
 ```
