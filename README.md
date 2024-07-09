@@ -1,7 +1,11 @@
-# AICITY2024 Track 2 - Code from AIO_ISC Team
-[Khai Trinh Xuan](https://github.com/trinhxuankhai), [Khoi Nguyen Nguyen](https://github.com/nguyen-brat), [Bach Hoang Ngo](https://github.com/BachNgoH), [Vu Dinh Xuan](https://github.com/dxv2k), [Minh-Hung An](https://github.com/anminhhung)
+# [CVPRW 2024] Divide and Conquer Boosting for Enhanced Traffic Safety Description and Analysis with Large Vision Language Model 
 
-The 2nd Place Solution to The 8th NVIDIA AI City Challenge (2024) Track 2
+[Khai Trinh Xuan](https://github.com/trinhxuankhai), [Khoi Nguyen Nguyen](https://github.com/nguyen-brat), [Bach Hoang Ngo](https://github.com/BachNgoH), [Vu Dinh Xuan](https://github.com/dxv2k), [Minh-Hung An](https://github.com/anminhhung), Quang-Vinh Dinh
+
+⭐ The 2nd Place Solution to The 8th NVIDIA AI City Challenge (2024) Track 2 from AIO_ISC Team.
+
+[![Read the Paper](https://img.shields.io/badge/Paper-red)](https://openaccess.thecvf.com/content/CVPR2024W/AICity/papers/Xuan_Divide_and_Conquer_Boosting_for_Enhanced_Traffic_Safety_Description_and_CVPRW_2024_paper.pdf)
+
 <p align="center">
     <img src="figures/main_figure.jpg"/>
 </p>
