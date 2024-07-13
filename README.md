@@ -138,12 +138,13 @@ sudo docker run -it --gpus all -v ./:/home/code -w /home/code segment_extraction
 ## Citation
 If you have any questions, please leave an issue or contact us: trinhxuankhai2310@gmail.com
 ```
-@inproceedings{xuan2024divide,
-  title={Divide and conquer boosting for enhanced traffic safety description and analysis with large vision language model},
-  author={Xuan, Khai Trinh and Nguyen, Khoi Nguyen and Ngo, Bach Hoang and Xuan, Vu Dinh and An, Minh-Hung and Dinh, Quang-Vinh},
-  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-  pages={7046--7055},
-  year={2024}
+@InProceedings{Xuan_2024_CVPR,
+    author    = {Xuan, Khai Trinh and Nguyen, Khoi Nguyen and Ngo, Bach Hoang and Xuan, Vu Dinh and An, Minh-Hung and Dinh, Quang-Vinh},
+    title     = {Divide and Conquer Boosting for Enhanced Traffic Safety Description and Analysis with Large Vision Language Model},
+    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops},
+    month     = {June},
+    year      = {2024},
+    pages     = {7046-7055}
 }
 ```
 
